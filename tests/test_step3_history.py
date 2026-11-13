@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage, HumanMessage
 
 import app.main as main
+import app.turns as turns
 from app.agent.history import turns_to_messages
 
 client = TestClient(main.app)
@@ -40,11 +41,11 @@ def test_empty_turns():
 def _capture(monkeypatch):
     seen = []
 
-    async def fake(message: str, history=None, gateway=None) -> str:
+    async def fake(message: str, history=None, gateway=None, extra_system=None) -> str:
         seen.append((message, list(history or [])))
         return f"reply to {message}"
 
-    monkeypatch.setattr(main, "run_turn", fake)
+    monkeypatch.setattr(turns, "run_turn", fake)
     return seen
 
 

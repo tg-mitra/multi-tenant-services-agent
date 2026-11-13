@@ -85,7 +85,21 @@ async def check_grievance_deadline(grievance_id: str, config: RunnableConfig) ->
     return await _gw(config).check_grievance_deadline(grievance_id)
 
 
+@tool
+async def propose_grievance(
+    category: str, description: str, config: RunnableConfig, expedite_requested: bool = False
+) -> dict:
+    """Prepare a grievance for the rep to confirm. Use ONLY when the rep explicitly asks to file a grievance
+    for the member. category: billing | quality_of_care | access | customer_service | other. description: a
+    short, factual summary of this one issue in the rep's words (claim id, date and provider are fine; no
+    SSN, DOB or contact details). expedite_requested: true only if the rep asked for it and gave a reason
+    (put the reason in the description); the plan's clinical staff decide. This does NOT file anything:
+    the rep must confirm in their next message."""
+    return await _gw(config).propose_grievance(category, description, expedite_requested)
+
+
 TOOLS = [
     get_member_summary, get_benefits, list_claims, get_claim, verify_caller,
     search_plan_documents, get_plan_status, check_appeal_window, list_grievances, check_grievance_deadline,
+    propose_grievance,
 ]

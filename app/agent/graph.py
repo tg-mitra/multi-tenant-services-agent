@@ -8,6 +8,7 @@ from __future__ import annotations
 from functools import lru_cache
 
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
 from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, START, MessagesState, StateGraph
@@ -44,8 +45,10 @@ def build_graph(settings: Settings | None = None):
     model = _build_model(settings).bind_tools(TOOLS)
     system = SystemMessage(content=system_prompt(settings.as_of_date))
 
-    async def call_model(state: MessagesState) -> dict:
-        reply = await model.ainvoke([system, *state["messages"]])
+    async def call_model(state: MessagesState, config: RunnableConfig) -> dict:
+        extra = (config.get("configurable") or {}).get("extra_system")
+        prefix = [system, SystemMessage(content=extra)] if extra else [system]
+        reply = await model.ainvoke([*prefix, *state["messages"]])
         return {"messages": [reply]}
 
     graph = StateGraph(MessagesState)
@@ -73,12 +76,15 @@ async def run_turn(
     message: str,
     history: list[BaseMessage] | None = None,
     gateway: ToolGateway | None = None,
+    extra_system: str | None = None,
 ) -> str:
-    """Run one rep message (after any earlier exchanges) through the graph; return the text reply."""
+    """Run one rep message (after any earlier exchanges) through the graph; return the text reply.
+
+    `extra_system` is a per-request system note (for example "a grievance proposal is waiting")."""
     settings = get_settings()
     messages = [*(history or []), HumanMessage(content=message)]
     config = {
-        "configurable": {"gateway": gateway},
+        "configurable": {"gateway": gateway, "extra_system": extra_system},
         "recursion_limit": settings.max_graph_steps,
     }
     try:

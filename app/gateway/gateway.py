@@ -28,8 +28,10 @@ import httpx
 
 from app.calc import deadline_status, fmt_money, money_line, parse_date
 from app.config import Settings
-from app.gateway.phi import sanitize_result
+from app.gateway.phi import redact_text, sanitize_result
+from app.grievance import CATEGORIES, MAX_DESCRIPTION, new_pending, pending_is_consistent
 from app.rag.kb import KbLookupError, KnowledgeBase, get_kb
+from app.store.jsonfile import IdempotencyStore
 
 log =logging.getLogger("uvicorn.error")
 
@@ -46,6 +48,7 @@ class SessionContext:
     conversation_id: str
 
 
+_grievance_locks: dict[tuple[str, str, str], asyncio.Lock] = {}  # one writer per (tenant, member, key)
 SSN_LAST4_ARG_RE = re.compile(r"^\d{4}$")
 DOB_ARG_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -72,10 +75,13 @@ class ToolGateway:
         settings: Settings,
         client: httpx.AsyncClient | None = None,
         kb: KnowledgeBase | None = None,
+        idem_store: IdempotencyStore | None = None,
     ):
         self.ctx = ctx
         self.settings = settings
         self._kb_obj = kb
+        self.idem = idem_store
+        self.proposal: dict | None = None  # set by propose_grievance; persisted by the API layer
         self._benefits: dict | None = None  # benefits record, fetched at most once per rep message
         self._client = client
         self._owns_client = client is None
@@ -439,3 +445,140 @@ class ToolGateway:
             "as_of": res["as_of"], "past_resolution_deadline": past,
             "days_overdue": res["days_overdue"] if not resolved else None, "source": source,
         }
+
+    # ---- filing a grievance (Step 7) --------------------------------------------------------
+    # The model can only PROPOSE. file_grievance() is called by the API layer after the rep's own
+    # next message was classified as a confirmation; it is not exposed as a tool.
+    @_filtered
+    async def propose_grievance(self, category: str, description: str, expedite_requested: bool = False) -> dict:
+        """Prepare a pending proposal for the rep to confirm. Never calls the write API."""
+        if category not in CATEGORIES:
+            return _err("invalid_argument", f"category must be one of {', '.join(CATEGORIES)}.")
+        if not isinstance(description, str) or not description.strip():
+            return _err("invalid_argument", "description is required.")
+        if not isinstance(expedite_requested, bool):
+            return _err("invalid_argument", "expedite_requested must be true or false.")
+        text = description.strip()
+        if self.settings.phi_filter_enabled:
+            text = redact_text(text)[0]  # no identifiers in what is filed or shown
+        if len(text) > MAX_DESCRIPTION:
+            return _err("invalid_argument", f"description is too long (max {MAX_DESCRIPTION} characters).")
+        duplicates: list[str] = []
+        status, items = await self._grievances()  # best effort: a failure here does not block the proposal
+        if items:
+            duplicates = [g["grievance_id"] for g in items
+                          if g.get("category") == category and g.get("status") not in ("RESOLVED", "CLOSED")]
+        self.proposal = new_pending(self.ctx.tenant, self.ctx.member_id, category, text, expedite_requested,
+                                    self.settings.pending_ttl_seconds, duplicates)
+        return {
+            "status": "awaiting_rep_confirmation",
+            "category": category, "description": text, "expedite_requested": expedite_requested,
+            "possible_duplicates": duplicates,
+            "instruction": ("Nothing has been filed. The system will now show the rep a read-back and ask them "
+                            "to confirm or cancel. Reply with ONE short sentence and do not say it was filed."),
+        }
+
+    def _auth_headers(self) -> dict | None:
+        token = self.settings.tenant_tokens.get(self.ctx.tenant, "")
+        return {"Authorization": f"Bearer {token}"} if token else None
+
+    async def _find_saved_grievance(self, pending: dict) -> dict | None:
+        """After retries are exhausted: was it saved anyway? (the mock can answer 503 after saving)"""
+        status, items = await self._grievances()
+        if not items:
+            return None
+        matches = [g for g in items
+                   if g.get("category") == pending["category"]
+                   and (g.get("description") or "").strip() == pending["description"]
+                   and bool(g.get("expedite_requested")) == bool(pending["expedite_requested"])
+                   and g.get("received_date") == self.settings.as_of_date]
+        return matches[-1] if matches else None
+
+    @staticmethod
+    def _grievance_summary(g: dict) -> dict:
+        return {k: g.get(k) for k in ("grievance_id", "status", "received_date", "category")}
+
+    async def file_grievance(self, pending: dict) -> dict:
+        """Write the confirmed grievance exactly once.
+
+        Returns {"state": "filed" | "already_filed" | "unconfirmed" | "failed", ...}. Safe to call again
+        for the same pending action: the idempotency key and the exact request bytes never change.
+        """
+        if self.idem is None:
+            return {"state": "failed", "reason": "no_idempotency_store"}
+        if not pending_is_consistent(pending, self.ctx.tenant, self.ctx.member_id):
+            log.error("gateway tool=file_grievance conv=%s decision=denied reason=inconsistent_pending",
+                      self.ctx.conversation_id)
+            return {"state": "failed", "reason": "inconsistent_pending"}
+        headers = self._auth_headers()
+        if headers is None:
+            return {"state": "failed", "reason": "no_tenant_token"}
+        key, body = pending["idempotency_key"], pending["body"]
+        tenant, member = self.ctx.tenant, self.ctx.member_id
+
+        lock = _grievance_locks.setdefault((tenant, member, key), asyncio.Lock())
+        async with lock:
+            record = self.idem.get(tenant, key)
+            if record and record.get("status") == "done":
+                return {"state": "already_filed", "grievance": record["grievance"]}
+            # Written BEFORE the POST: if we crash or time out, the key survives and is reused.
+            self.idem.put(tenant, key, {"status": "in_flight", "member_id": member,
+                                        "conversation_id": self.ctx.conversation_id})
+            post_headers = {**headers, "Idempotency-Key": key, "Content-Type": "application/json"}
+            path = f"/tenants/{tenant}/members/{member}/grievances"
+            attempts = 0
+            for attempt in range(self.settings.max_grievance_retries + 1):
+                attempts += 1
+                started = time.perf_counter()
+                try:
+                    resp = await self._client.post(path, content=body.encode("utf-8"), headers=post_headers)
+                    status = resp.status_code
+                except httpx.HTTPError:
+                    resp, status = None, 0
+                log.info("gateway tool=file_grievance conv=%s key=%s attempt=%d status=%s ms=%d",
+                         self.ctx.conversation_id, key[:10], attempts, status,
+                         int((time.perf_counter() - started) * 1000))
+                if status in (200, 201):
+                    try:
+                        grievance = resp.json()
+                    except ValueError:
+                        break  # cannot read the answer: treat as unconfirmed and verify below
+                    summary = self._grievance_summary(grievance)
+                    self.idem.put(tenant, key, {"status": "done", "member_id": member, "grievance": summary})
+                    return {"state": "filed", "grievance": summary, "attempts": attempts}
+                if status in (0, 429, 500, 502, 503, 504):  # the write may or may not have happened
+                    if attempt < self.settings.max_grievance_retries:
+                        delay = self.settings.grievance_retry_delay_seconds
+                        if status == 429:
+                            try:
+                                delay = min(float(resp.headers.get("Retry-After", "1")),
+                                            self.settings.retry_after_max_seconds)
+                            except ValueError:
+                                pass
+                        await asyncio.sleep(delay)
+                        continue
+                    break
+                # any other answer (validation, auth, ...) is final: nothing was written
+                self.idem.put(tenant, key, {"status": "failed", "member_id": member, "http_status": status})
+                return {"state": "failed", "http_status": status}
+
+            found = await self._find_saved_grievance(pending)
+            if found:
+                summary = self._grievance_summary(found)
+                self.idem.put(tenant, key, {"status": "done", "member_id": member, "grievance": summary})
+                return {"state": "filed", "grievance": summary, "attempts": attempts, "verified_by_listing": True}
+            return {"state": "unconfirmed", "attempts": attempts}
+
+    def timeframe_days(self) -> tuple[int, str] | None:
+        """The plan's grievance resolution timeframe (tenant-specific), best effort."""
+        try:
+            product = (self._benefits or {}).get("product_code")
+            if not product:
+                return None
+            return self._kb().rule_days(self.ctx.tenant, product, int(self.settings.as_of_date[:4]),
+                                        "Grievance resolution timeframe")
+        except Exception:
+            return None
+
+    async def ensure_benefits(self) -> None:
+        await self._load_benefits()

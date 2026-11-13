@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 import app.main as main
+import app.turns as turns
 from app.agent.graph import LLMNotConfigured
 
 client = TestClient(main.app)
@@ -15,10 +16,10 @@ def test_health():
 
 
 def test_conversation_returns_reply(monkeypatch):
-    async def fake(message: str, history=None, gateway=None) -> str:
+    async def fake(message: str, history=None, gateway=None, extra_system=None) -> str:
         return f"echo: {message}"
 
-    monkeypatch.setattr(main, "run_turn", fake)
+    monkeypatch.setattr(turns, "run_turn", fake)
     r = client.post("/conversations", json=VALID)
     assert r.status_code == 200
     body = r.json()
@@ -43,19 +44,19 @@ def test_rejects_empty_message():
 
 
 def test_missing_key_gives_503(monkeypatch):
-    async def boom(message: str, history=None, gateway=None) -> str:
+    async def boom(message: str, history=None, gateway=None, extra_system=None) -> str:
         raise LLMNotConfigured("x")
 
-    monkeypatch.setattr(main, "run_turn", boom)
+    monkeypatch.setattr(turns, "run_turn", boom)
     r = client.post("/conversations", json=VALID)
     assert r.status_code == 503
 
 
 def test_llm_failure_does_not_leak_details(monkeypatch):
-    async def boom(message: str, history=None, gateway=None) -> str:
+    async def boom(message: str, history=None, gateway=None, extra_system=None) -> str:
         raise RuntimeError("secret upstream detail")
 
-    monkeypatch.setattr(main, "run_turn", boom)
+    monkeypatch.setattr(turns, "run_turn", boom)
     r = client.post("/conversations", json=VALID)
     assert r.status_code == 502
     assert "secret" not in r.text

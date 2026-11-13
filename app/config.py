@@ -32,6 +32,9 @@ class Settings:
     pack_dir: Path  # root of the supplied pack (mock_services/, eval/, kb/ ...)
     kb_dir: Path  # plan documents (default PACK_DIR/kb)
     rag_top_k: int  # passages returned per plan-document search
+    pending_ttl_seconds: int  # how long a grievance proposal waits for the rep's confirmation
+    max_grievance_retries: int  # retries of the grievance POST after a 503/timeout (same key, same bytes)
+    grievance_retry_delay_seconds: float
 
 
 def get_settings() -> Settings:
@@ -39,6 +42,9 @@ def get_settings() -> Settings:
     return Settings(
         kb_dir=Path(os.getenv("KB_DIR", "").strip() or (pack_dir / "kb")),
         rag_top_k=max(1, int(os.getenv("RAG_TOP_K", "5"))),
+        pending_ttl_seconds=max(30, int(os.getenv("PENDING_TTL_SECONDS", "900"))),
+        max_grievance_retries=max(0, int(os.getenv("MAX_GRIEVANCE_RETRIES", "3"))),
+        grievance_retry_delay_seconds=max(0.0, float(os.getenv("GRIEVANCE_RETRY_DELAY_SECONDS", "0.5"))),
         openai_api_key=os.getenv("OPENAI_API_KEY", "").strip(),
         openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip(),
         openai_base_url=(os.getenv("OPENAI_BASE_URL", "").strip() or None),

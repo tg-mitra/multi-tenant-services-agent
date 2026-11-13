@@ -6,6 +6,7 @@ import httpx
 from fastapi.testclient import TestClient
 
 import app.main as main
+import app.turns as turns
 from app.config import get_settings
 from app.gateway.gateway import SessionContext, ToolGateway
 from app.gateway.phi import BLOCKED_REPLY, detect, guard_output, redact_text, sanitize_result
@@ -190,10 +191,10 @@ def _state_text(state_dir) -> str:
 
 
 def test_reply_with_sensitive_value_is_blocked_and_not_stored(monkeypatch, isolated_state_dir):
-    async def fake(message, history=None, gateway=None):
+    async def fake(message, history=None, gateway=None, extra_system=None):
         return f"The SSN is {CANARY_SSN}"
 
-    monkeypatch.setattr(main, "run_turn", fake)
+    monkeypatch.setattr(turns, "run_turn", fake)
     r = client.post("/conversations", json=BODY)
     assert r.status_code == 200 and r.json()["reply"] == BLOCKED_REPLY
     assert CANARY_SSN not in r.text and CANARY_SSN not in _state_text(isolated_state_dir)
@@ -202,11 +203,11 @@ def test_reply_with_sensitive_value_is_blocked_and_not_stored(monkeypatch, isola
 def test_rep_typed_identifiers_are_redacted_for_model_and_file(monkeypatch, isolated_state_dir):
     seen = {}
 
-    async def fake(message, history=None, gateway=None):
+    async def fake(message, history=None, gateway=None, extra_system=None):
         seen["message"] = message
         return "ok"
 
-    monkeypatch.setattr(main, "run_turn", fake)
+    monkeypatch.setattr(turns, "run_turn", fake)
     msg = (f"Caller SSN {CANARY_SSN} phone {CANARY_PHONE} email {CANARY_EMAIL}; "
            f"last four digits of the SSN are 2331; DOB {CANARY_DOB}")
     client.post("/conversations", json={**BODY, "message": msg})
@@ -224,10 +225,10 @@ def test_rep_typed_identifiers_are_redacted_for_model_and_file(monkeypatch, isol
 def test_filter_off_leaves_text_untouched(monkeypatch, isolated_state_dir):
     monkeypatch.setenv("PHI_FILTER_ENABLED", "false")
 
-    async def fake(message, history=None, gateway=None):
+    async def fake(message, history=None, gateway=None, extra_system=None):
         return f"The SSN is {CANARY_SSN}"
 
-    monkeypatch.setattr(main, "run_turn", fake)
+    monkeypatch.setattr(turns, "run_turn", fake)
     r = client.post("/conversations", json={**BODY, "message": f"phone {CANARY_PHONE}"})
     assert CANARY_SSN in r.json()["reply"]
     assert CANARY_PHONE in _state_text(isolated_state_dir)
@@ -236,11 +237,11 @@ def test_filter_off_leaves_text_untouched(monkeypatch, isolated_state_dir):
 def test_follow_up_history_comes_from_the_redacted_file(monkeypatch):
     seen = []
 
-    async def fake(message, history=None, gateway=None):
+    async def fake(message, history=None, gateway=None, extra_system=None):
         seen.append(list(history or []))
         return "ok"
 
-    monkeypatch.setattr(main, "run_turn", fake)
+    monkeypatch.setattr(turns, "run_turn", fake)
     cid = client.post("/conversations", json={**BODY, "message": f"SSN {CANARY_SSN}"}).json()["conversation_id"]
     client.post("/conversations", json={**BODY, "message": "next", "conversation_id": cid})
     assert CANARY_SSN not in " ".join(m.content for m in seen[1])

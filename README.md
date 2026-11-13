@@ -2,7 +2,9 @@
 
 Governed multi-tenant assistant for member-services reps. See `SPEC.md` for the full specification and the step plan.
 
-Current status: Step 3 (LangGraph chat endpoint, conversations saved as JSON files, last `HISTORY_TURNS` exchanges sent to the LLM for follow-ups, no filter yet).
+Current status: Step 4 (tools through a gateway: member, benefits and claims). Start the mock API first (`python mock_services/server.py --port 8090`) and set `TENANT_TOKEN_PLAN_A` / `TENANT_TOKEN_PLAN_B` in `.env`. The model can look up the member on the call, their benefits accumulators and claims. It cannot choose the tenant or member. Plan rules (copays, deductible limits) arrive in Step 6.
+
+Earlier: Step 3 (LangGraph chat endpoint, conversations saved as JSON files, last `HISTORY_TURNS` exchanges sent to the LLM for follow-ups, no filter yet).
 
 Follow-ups: when you send an existing `conversation_id`, the last `HISTORY_TURNS` exchanges (default 8, set in `.env`; 0 turns it off) are sent to the model with your new message. The file always keeps the full conversation; the setting only limits what the model sees.
 

@@ -10,7 +10,7 @@ VALID = {"tenant": "plan_a", "member_id": "M749817", "message": "Hello"}
 
 
 def _fake_llm(monkeypatch, reply="ok"):
-    async def fake(message: str, history=None) -> str:
+    async def fake(message: str, history=None, gateway=None) -> str:
         return f"{reply}: {message}"
 
     monkeypatch.setattr(main, "run_turn", fake)
@@ -111,7 +111,7 @@ def test_other_member_or_tenant_cannot_use_the_id(monkeypatch):
 # ---- failures -------------------------------------------------------------
 
 def test_llm_failure_on_new_conversation_creates_no_file(monkeypatch, isolated_state_dir):
-    async def boom(message: str, history=None) -> str:
+    async def boom(message: str, history=None, gateway=None) -> str:
         raise RuntimeError("secret upstream detail")
 
     monkeypatch.setattr(main, "run_turn", boom)
@@ -126,7 +126,7 @@ def test_llm_failure_on_existing_conversation_keeps_id_and_file(monkeypatch, iso
     _fake_llm(monkeypatch)
     cid = _post().json()["conversation_id"]
 
-    async def boom(message: str, history=None) -> str:
+    async def boom(message: str, history=None, gateway=None) -> str:
         raise RuntimeError("x")
 
     monkeypatch.setattr(main, "run_turn", boom)

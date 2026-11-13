@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field, field_validator
 from app.agent.graph import LLMNotConfigured, run_turn
 from app.agent.history import turns_to_messages
 from app.config import get_settings
+from app.gateway.gateway import SessionContext, ToolGateway
 from app.store.jsonfile import CONVERSATION_ID_RE, JsonConversationStore
 
 log = logging.getLogger("uvicorn.error")
@@ -91,8 +92,11 @@ async def conversations(req: ConversationRequest):
     known_id = None if is_new else conversation_id
 
     started = time.perf_counter()
+    ctx = SessionContext(tenant=req.tenant, member_id=req.member_id, conversation_id=conversation_id)
     try:
-        reply = await run_turn(req.message, history)
+        # Tenant and member come from the request/session only; the model cannot change them.
+        async with ToolGateway(ctx, settings) as gateway:
+            reply = await run_turn(req.message, history, gateway=gateway)
     except LLMNotConfigured:
         return _error(503, "LLM is not configured", known_id)
     except Exception as exc:

@@ -1,5 +1,17 @@
 # NOTES
 
+## What each part of the app does
+
+- **Tool gateway** — the only code path that reaches a downstream system; injects tenant/member from the session, never the model.
+- **PHI filter** — allow-lists what reaches the model, blocks sensitive replies, redacts everything saved to disk.
+- **Follow-up memory** — last `HISTORY_TURNS` exchanges resent on each turn, so a rep can ask "and the ER?" without repeating context.
+- **RAG over plan documents** — retrieval filtered by tenant, product and plan year before ranking, so it can never answer from another tenant's or product's document.
+- **Calculators** — deductible/OOP/PT-visit remaining, appeal and grievance deadlines computed in code, never by the model.
+- **Grievance with human confirmation** — the model can only propose; the rep's own next message files it, exactly once, idempotent under retries.
+- **Provider directory** — our own wrapper over the third-party vendor; only specialty/network/ZIP leave the system, never member identifiers.
+- **Budgets & trace** — per-conversation limits on steps/cost/time, and a redacted step-by-step trace of every model and tool call.
+- **Evaluation harness & gate** — runs all 40 cases, scores them, fails the build on a hard-fail or a regression.
+
 ## Decisions and assumptions
 
 - Built in 10 committed steps (chat → storage → history → tools/gateway → PHI filter → RAG/calculators → grievance confirmation → provider directory → budgets/trace → eval harness), testing each against the mock and the real model before moving on. Real history, no squashing.
@@ -22,7 +34,3 @@
 
 Close the latency gap (p95 ≈13 s vs. 3 s): a faster model, a single claims-summary tool instead of paging, parallel tool calls. 
 Replace regex PHI scrubbing with a DLP/NER layer. 
-
-## How AI tools were used
-
-Built end-to-end with Claude Code, in conversation — I reviewed and tested every step against the mock and the real model before approving the next. Most helpful: turning pack findings (the misfiled KB doc, the token/idempotency traps) into tests the moment I found them, and the eval harness catching three real agent bugs on its first full run (a member-not-in-tenant answer, a missing denial-code explanation, a terminated member still quoted a cost) that it then fixed in code, not the prompt. Where it was wrong: its first scoring logic was too strict and under-counted correct answers until I had it loosen matching with negative tests; a draft architecture diagram had invisible leftover markup that only showed up once I had it render and inspect the file; and more than once I turned its "done, verified" into an actual run of the tests or a live request before accepting it.

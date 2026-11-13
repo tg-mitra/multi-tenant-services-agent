@@ -26,6 +26,10 @@ class Settings:
     max_api_retries: int  # retries after a 429
     max_graph_steps: int  # LangGraph recursion limit: model+tool hops per turn
     as_of_date: str
+    phi_filter_enabled: bool  # output guard, redaction of saved files, scrubbing of tool results
+    max_verify_attempts: int  # verify_caller calls allowed per rep message
+    dev_endpoints_enabled: bool  # GET /dev/members (reads the pack files directly; development only)
+    pack_dir: Path  # root of the supplied pack (mock_services/, eval/, kb/ ...)
 
 
 def get_settings() -> Settings:
@@ -47,6 +51,10 @@ def get_settings() -> Settings:
         max_api_retries=int(os.getenv("MAX_API_RETRIES", "2")),
         max_graph_steps=int(os.getenv("MAX_GRAPH_STEPS", "12")),
         as_of_date=os.getenv("AS_OF_DATE", "2026-11-15").strip(),
+        phi_filter_enabled=os.getenv("PHI_FILTER_ENABLED", "true").strip().lower() not in ("0", "false", "no", "off"),
+        max_verify_attempts=int(os.getenv("MAX_VERIFY_ATTEMPTS", "3")),
+        dev_endpoints_enabled=os.getenv("DEV_ENDPOINTS_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on"),
+        pack_dir=Path(os.getenv("PACK_DIR", ".").strip() or "."),
         history_turns=max(0, int(os.getenv("HISTORY_TURNS", "8").strip() or "8")),
         state_dir=Path(os.getenv("STATE_DIR", "./state").strip() or "./state"),
     )

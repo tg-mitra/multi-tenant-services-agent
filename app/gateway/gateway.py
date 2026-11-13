@@ -16,6 +16,8 @@ instructions aimed at an AI agent).
 from __future__ import annotations
 
 import asyncio
+import functools
+import hmac
 import logging
 import re
 import time
@@ -25,8 +27,9 @@ from urllib.parse import parse_qs, urlparse
 import httpx
 
 from app.config import Settings
+from app.gateway.phi import sanitize_result
 
-log = logging.getLogger("uvicorn.error")
+log =logging.getLogger("uvicorn.error")
 
 CLAIM_ID_RE = re.compile(r"^C\d{6,12}$")
 MAX_CURSOR = 100_000
@@ -40,8 +43,23 @@ class SessionContext:
     conversation_id: str
 
 
+SSN_LAST4_ARG_RE = re.compile(r"^\d{4}$")
+DOB_ARG_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
 def _err(code: str, message: str) -> dict:
     return {"error": code, "message": message}
+
+
+def _filtered(fn):
+    """Scrub free text in a tool result for SSN/phone/email/DOB patterns (when PHI_FILTER_ENABLED)."""
+
+    @functools.wraps(fn)
+    async def wrapper(self, *args, **kwargs):
+        result = await fn(self, *args, **kwargs)
+        return sanitize_result(result) if self.settings.phi_filter_enabled else result
+
+    return wrapper
 
 
 class ToolGateway:
@@ -50,6 +68,7 @@ class ToolGateway:
         self.settings = settings
         self._client = client
         self._owns_client = client is None
+        self._verify_calls = 0
 
     async def __aenter__(self) -> "ToolGateway":
         if self._client is None:
@@ -132,6 +151,7 @@ class ToolGateway:
     def _member_path(self, suffix: str = "") -> str:
         return f"/tenants/{self.ctx.tenant}/members/{self.ctx.member_id}{suffix}"
 
+    @_filtered
     async def get_member_summary(self) -> dict:
         status, data = await self._get("get_member_summary", self._member_path())
         if data is None:
@@ -144,6 +164,7 @@ class ToolGateway:
             "coverage_termination": data.get("coverage_termination"),
         }
 
+    @_filtered
     async def get_benefits(self) -> dict:
         status, data = await self._get("get_benefits", self._member_path("/benefits"))
         if data is None:
@@ -158,6 +179,7 @@ class ToolGateway:
             "accumulators": data.get("accumulators"),
         }
 
+    @_filtered
     async def list_claims(self, cursor: int = 0) -> dict:
         if not isinstance(cursor, int) or isinstance(cursor, bool) or not 0 <= cursor <= MAX_CURSOR:
             return _err("invalid_argument", "cursor must be a whole number from the previous result.")
@@ -180,6 +202,37 @@ class ToolGateway:
                 next_cursor = None
         return {"claims": claims, "next_cursor": next_cursor, "order": "newest service date first"}
 
+    async def verify_caller(self, ssn_last4: str | None = None, dob: str | None = None) -> dict:
+        """Compare what the caller said with the record, inside the gateway.
+
+        The raw record (with SSN and DOB) is read here and never leaves this method. The model only
+        gets {"match": true|false, "checked": [...]}: no values, and no hint which field differed.
+        """
+        ssn_last4 = (ssn_last4 or "").strip() or None
+        dob = (dob or "").strip() or None
+        if ssn_last4 is None and dob is None:
+            return _err("invalid_argument", "Provide ssn_last4 and/or dob (YYYY-MM-DD) as the caller stated them.")
+        if (ssn_last4 and not SSN_LAST4_ARG_RE.fullmatch(ssn_last4)) or (dob and not DOB_ARG_RE.fullmatch(dob)):
+            return _err("invalid_argument", "ssn_last4 must be 4 digits and dob must be YYYY-MM-DD.")
+        self._verify_calls += 1
+        if self._verify_calls > self.settings.max_verify_attempts:
+            log.warning("gateway tool=verify_caller conv=%s decision=denied reason=too_many_attempts",
+                        self.ctx.conversation_id)
+            return _err("too_many_attempts", "Too many verification attempts. Ask the rep to follow the manual process.")
+        status, data = await self._get("verify_caller", self._member_path())
+        if data is None:
+            return self._failure(status, "The member")
+        checks = []
+        if ssn_last4:
+            actual = re.sub(r"\D", "", str(data.get("ssn") or ""))[-4:]
+            checks.append(bool(actual) and hmac.compare_digest(actual.encode(), ssn_last4.encode()))
+        if dob:
+            checks.append(hmac.compare_digest(str(data.get("dob") or "").encode(), dob.encode()))
+        checked = [n for n, v in (("ssn_last4", ssn_last4), ("dob", dob)) if v]
+        log.info("gateway tool=verify_caller conv=%s checked=%s", self.ctx.conversation_id, ",".join(checked))
+        return {"match": all(checks), "checked": checked}
+
+    @_filtered
     async def get_claim(self, claim_id: str) -> dict:
         if not isinstance(claim_id, str) or not CLAIM_ID_RE.fullmatch(claim_id.strip()):
             return _err("invalid_argument", "claim_id must look like C2639555547.")

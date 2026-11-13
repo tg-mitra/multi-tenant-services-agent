@@ -21,7 +21,9 @@ from pydantic import BaseModel, Field, field_validator
 from app.agent.graph import LLMNotConfigured, run_turn
 from app.agent.history import turns_to_messages
 from app.config import get_settings
+from app.dev import PackNotFound, list_tenants_and_members
 from app.gateway.gateway import SessionContext, ToolGateway
+from app.gateway.phi import guard_output, redact_text
 from app.store.jsonfile import CONVERSATION_ID_RE, JsonConversationStore
 
 log = logging.getLogger("uvicorn.error")
@@ -70,6 +72,24 @@ async def health() -> dict:
     return {"status": "ok"}
 
 
+@app.get("/dev/members")
+async def dev_members(tenant: Optional[Literal["plan_a", "plan_b"]] = None):
+    """Development helper: tenants with their member ids (no names or other PHI).
+
+    Off unless DEV_ENDPOINTS_ENABLED=true; when off it behaves like any unknown route (404).
+    """
+    settings = get_settings()
+    if not settings.dev_endpoints_enabled:
+        return JSONResponse(status_code=404, content={"detail": "Not Found"})
+    try:
+        return list_tenants_and_members(settings, tenant)
+    except PackNotFound:
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "Pack files not found. Set PACK_DIR to the folder that contains mock_services/."},
+        )
+
+
 @app.post("/conversations", response_model=ConversationResponse)
 async def conversations(req: ConversationRequest):
     settings = get_settings()
@@ -93,10 +113,15 @@ async def conversations(req: ConversationRequest):
 
     started = time.perf_counter()
     ctx = SessionContext(tenant=req.tenant, member_id=req.member_id, conversation_id=conversation_id)
+    model_message = req.message
+    if settings.phi_filter_enabled:
+        # Minimum necessary: a full SSN, phone or email typed by the rep is not sent to the model.
+        # The caller's last-4 / DOB stay, because verify_caller needs them.
+        model_message, _ = redact_text(req.message, skip={"dob", "ssn_last4"})
     try:
         # Tenant and member come from the request/session only; the model cannot change them.
         async with ToolGateway(ctx, settings) as gateway:
-            reply = await run_turn(req.message, history, gateway=gateway)
+            reply = await run_turn(model_message, history, gateway=gateway)
     except LLMNotConfigured:
         return _error(503, "LLM is not configured", known_id)
     except Exception as exc:
@@ -112,13 +137,27 @@ async def conversations(req: ConversationRequest):
         return _error(502, "LLM request failed", known_id)
     latency_ms = int((time.perf_counter() - started) * 1000)
 
+    saved_rep_message = req.message
+    if settings.phi_filter_enabled:
+        # Output guard: never return an SSN/phone/email/DOB-shaped value to the rep.
+        reply, blocked = guard_output(reply)
+        if blocked:
+            log.warning("phi output guard blocked reply conv=%s kinds=%s", conversation_id, ",".join(blocked))
+        # What is written to disk is redacted (the rep may have typed identifiers).
+        saved_rep_message, counts = redact_text(req.message)
+        reply_to_save, reply_counts = redact_text(reply)
+        if counts or reply_counts:
+            log.info("phi redaction conv=%s in=%s out=%s", conversation_id, counts, reply_counts)
+    else:
+        reply_to_save = reply
+
     try:
         await store.append_turn(
             req.tenant,
             req.member_id,
             conversation_id,
-            rep_message=req.message,
-            assistant_reply=reply,
+            rep_message=saved_rep_message,
+            assistant_reply=reply_to_save,
             model=settings.openai_model,
             latency_ms=latency_ms,
             is_new=is_new,

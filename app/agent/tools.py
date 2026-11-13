@@ -38,4 +38,14 @@ async def get_claim(claim_id: str, config: RunnableConfig) -> dict:
     return await _gw(config).get_claim(claim_id)
 
 
-TOOLS = [get_member_summary, get_benefits, list_claims, get_claim]
+@tool
+async def verify_caller(
+    config: RunnableConfig, ssn_last4: str | None = None, dob: str | None = None
+) -> dict:
+    """Check what the caller said against the member's record. Pass the last 4 SSN digits and/or the
+    date of birth (YYYY-MM-DD) exactly as the caller gave them. Returns only {match: true|false}; it
+    never returns the stored values."""
+    return await _gw(config).verify_caller(ssn_last4, dob)
+
+
+TOOLS = [get_member_summary, get_benefits, list_claims, get_claim, verify_caller]

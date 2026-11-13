@@ -2,7 +2,11 @@
 
 Governed multi-tenant assistant for member-services reps. See `SPEC.md` for the full specification and the step plan.
 
-Current status: Step 4 (tools through a gateway: member, benefits and claims). Start the mock API first (`python mock_services/server.py --port 8090`) and set `TENANT_TOKEN_PLAN_A` / `TENANT_TOKEN_PLAN_B` in `.env`. The model can look up the member on the call, their benefits accumulators and claims. It cannot choose the tenant or member. Plan rules (copays, deductible limits) arrive in Step 6.
+Dev helper: `GET /dev/members` (optional `?tenant=plan_a`) lists the tenants, their products and every member id with plan, coverage status and the eval cases that use that member, so you know what to send to `/conversations`. It returns no names, DOB, SSN or other PHI. It is off unless `DEV_ENDPOINTS_ENABLED=true` in `.env` and it reads the pack files directly (the mock API has no list endpoint), so it is for development only.
+
+Current status: Step 5 (PHI filter). The model can check a caller's last-4 SSN or DOB (`verify_caller`, match/no-match only), refuses to share identifiers, sensitive replies are blocked, and saved conversation files are redacted. Switch with `PHI_FILTER_ENABLED` in `.env`. Postman collection with all APIs (ours and the mock): `docs/emid.postman_collection.json` (fill the token variables locally; do not commit them).
+
+Earlier: Step 4 (tools through a gateway: member, benefits and claims). Start the mock API first (`python mock_services/server.py --port 8090`) and set `TENANT_TOKEN_PLAN_A` / `TENANT_TOKEN_PLAN_B` in `.env`. The model can look up the member on the call, their benefits accumulators and claims. It cannot choose the tenant or member. Plan rules (copays, deductible limits) arrive in Step 6.
 
 Earlier: Step 3 (LangGraph chat endpoint, conversations saved as JSON files, last `HISTORY_TURNS` exchanges sent to the LLM for follow-ups, no filter yet).
 

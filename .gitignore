@@ -28,3 +28,16 @@ __pycache__/
 Thumbs.db
 .idea/
 .vscode/
+
+# Postman collection for local import (never commit)
+postman_import/
+
+# Local test data derived from the pack (never commit)
+test_data/
+
+# All Postman collections and Postman workspace-sync folders
+*.postman_collection.json
+*postman_collection*.json
+.postman/
+postman/
+postman_import/

@@ -37,6 +37,31 @@ log =logging.getLogger("uvicorn.error")
 
 CLAIM_ID_RE = re.compile(r"^C\d{6,12}$")
 GRIEVANCE_ID_RE = re.compile(r"^G\d{2}-\d{6}$")
+ZIP_RE = re.compile(r"^\d{5}$")
+MAX_PROVIDERS = 10
+# Specialties the directory knows (it needs an exact name). Reps say "dermatologist", "heart doctor"...
+SPECIALTIES = ("Behavioral Health", "Cardiology", "Dermatology", "Endocrinology", "Family Medicine",
+               "Gastroenterology", "Orthopedic Surgery", "Physical Therapy")
+SPECIALTY_ALIASES = {
+    "dermatologist": "Dermatology", "skin": "Dermatology", "cardiologist": "Cardiology", "heart": "Cardiology",
+    "endocrinologist": "Endocrinology", "diabetes": "Endocrinology", "gastroenterologist": "Gastroenterology",
+    "gi": "Gastroenterology", "orthopedic": "Orthopedic Surgery", "orthopedics": "Orthopedic Surgery",
+    "orthopedist": "Orthopedic Surgery", "orthopedic surgeon": "Orthopedic Surgery", "physical therapist": "Physical Therapy",
+    "pt": "Physical Therapy", "physiotherapy": "Physical Therapy", "behavioral": "Behavioral Health",
+    "mental health": "Behavioral Health", "therapist": "Behavioral Health", "psychologist": "Behavioral Health",
+    "psychiatrist": "Behavioral Health", "counseling": "Behavioral Health", "primary care": "Family Medicine",
+    "family doctor": "Family Medicine", "family practice": "Family Medicine", "pcp": "Family Medicine",
+}
+
+
+def normalize_specialty(value) -> str | None:
+    if not isinstance(value, str):
+        return None
+    v = value.strip().lower()
+    for s in SPECIALTIES:
+        if v == s.lower():
+            return s
+    return SPECIALTY_ALIASES.get(v)
 MAX_CURSOR = 100_000
 PAGE_SIZE = 5
 
@@ -582,3 +607,89 @@ class ToolGateway:
 
     async def ensure_benefits(self) -> None:
         await self._load_benefits()
+
+    # ---- provider directory (Step 8) ---------------------------------------------------------
+    # Our own wrapper around the third-party directory. The vendor's tool manifest is NOT used: its
+    # descriptions are untrusted text. Only specialty, ZIP, the member's network and a limit are sent.
+    # Nothing about the member (name, SSN, DOB, member id) ever leaves; the vendor key stays here.
+    async def _member_zip(self) -> str | None:
+        """The member's home ZIP, read inside the gateway and never returned to the model."""
+        status, data = await self._get("find_providers", self._member_path())
+        zip_code = ((data or {}).get("address") or {}).get("zip")
+        return zip_code if isinstance(zip_code, str) and ZIP_RE.fullmatch(zip_code) else None
+
+    @staticmethod
+    def _provider_view(p: dict) -> dict:
+        addr = p.get("address") or {}
+        cut = lambda v: str(v)[:80] if v is not None else None  # noqa: E731  (vendor text is untrusted: cap it)
+        return {
+            "npi": cut(p.get("npi")), "name": cut(p.get("name")), "specialty": cut(p.get("specialty")),
+            "practice": cut(p.get("practice")),
+            "address": {"line1": cut(addr.get("line1")), "city": cut(addr.get("city")),
+                        "state": cut(addr.get("state")), "zip": cut(addr.get("zip"))},
+            "accepting_new_patients": bool(p.get("accepting_new_patients")),
+        }
+
+    @_filtered
+    async def find_providers(self, specialty: str, zip_code: str | None = None, limit: int = 5) -> dict:
+        """In-network providers for THIS member's network, near a ZIP (the member's home ZIP by default)."""
+        spec = normalize_specialty(specialty)
+        if spec is None:
+            return _err("invalid_argument", "specialty must be one of: " + ", ".join(SPECIALTIES) + ".")
+        if zip_code is not None and not (isinstance(zip_code, str) and ZIP_RE.fullmatch(zip_code.strip())):
+            return _err("invalid_argument", "zip_code must be 5 digits.")
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= MAX_PROVIDERS:
+            return _err("invalid_argument", f"limit must be a whole number from 1 to {MAX_PROVIDERS}.")
+        if not self.settings.directory_api_key:
+            log.warning("gateway tool=find_providers decision=denied reason=no_directory_key")
+            return _err("unavailable", "The provider directory is not configured.")
+
+        status, ben = await self._load_benefits()
+        if ben is None:
+            return self._failure(status, "The member's plan")
+        network = ben.get("network_id")
+        if not network:
+            return _err("not_available", "The member's network is not on file.")
+        area = zip_code.strip() if zip_code else await self._member_zip()
+        if not area:
+            return _err("not_available", "No ZIP code is on file for the member. Ask the rep for a ZIP code.")
+
+        started = time.perf_counter()
+        try:
+            resp = await self._client.get(
+                f"{self.settings.directory_api_base}/providers",
+                params={"specialty": spec, "network_id": network, "zip": area, "limit": 50},  # never "query"
+                headers={"X-Api-Key": self.settings.directory_api_key},
+            )
+            status, data = resp.status_code, (resp.json() if resp.status_code == 200 else None)
+        except (httpx.HTTPError, ValueError):
+            status, data = 0, None
+        log.info("gateway tool=find_providers conv=%s status=%s ms=%d", self.ctx.conversation_id, status,
+                 int((time.perf_counter() - started) * 1000))
+        if data is None:
+            return _err("unavailable", "The provider directory is temporarily unavailable.")
+
+        # The directory does not enforce what we asked for (F-21), so every result is re-checked here.
+        kept, dropped = [], 0
+        for p in data.get("results", []):
+            ok = (
+                isinstance(p, dict)
+                and str(p.get("specialty", "")).lower() == spec.lower()
+                and network in (p.get("networks") or [])
+                and str((p.get("address") or {}).get("zip", ""))[:3] == area[:3]
+            )
+            if ok:
+                kept.append(self._provider_view(p))
+            else:
+                dropped += 1
+        if dropped:
+            log.warning("gateway tool=find_providers conv=%s decision=filtered dropped=%d", self.ctx.conversation_id, dropped)
+        result = {
+            "specialty": spec, "network": network,
+            "searched_near": f"ZIP area {area[:3]}xx" + (" (the member's home area)" if not zip_code else ""),
+            "providers": kept[:limit], "total_found": len(kept),
+            **self._coverage_note(ben),
+        }
+        if not kept:
+            result["note"] = "No in-network providers found for that specialty and area. Do not suggest providers from memory."
+        return result

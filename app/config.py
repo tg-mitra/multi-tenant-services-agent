@@ -32,6 +32,8 @@ class Settings:
     pack_dir: Path  # root of the supplied pack (mock_services/, eval/, kb/ ...)
     kb_dir: Path  # plan documents (default PACK_DIR/kb)
     rag_top_k: int  # passages returned per plan-document search
+    directory_api_base: str  # third-party provider directory (default: <MEMBER_API_BASE>/directory/v3)
+    directory_api_key: str  # vendor key, sent as X-Api-Key; never given to the model
     pending_ttl_seconds: int  # how long a grievance proposal waits for the rep's confirmation
     max_grievance_retries: int  # retries of the grievance POST after a 503/timeout (same key, same bytes)
     grievance_retry_delay_seconds: float
@@ -39,7 +41,10 @@ class Settings:
 
 def get_settings() -> Settings:
     pack_dir = Path(os.getenv("PACK_DIR", ".").strip() or ".")
+    member_api_base = os.getenv("MEMBER_API_BASE", "http://localhost:8090").strip().rstrip("/")
     return Settings(
+        directory_api_base=(os.getenv("DIRECTORY_API_BASE", "").strip().rstrip("/") or f"{member_api_base}/directory/v3"),
+        directory_api_key=os.getenv("DIRECTORY_API_KEY", "").strip(),
         kb_dir=Path(os.getenv("KB_DIR", "").strip() or (pack_dir / "kb")),
         rag_top_k=max(1, int(os.getenv("RAG_TOP_K", "5"))),
         pending_ttl_seconds=max(30, int(os.getenv("PENDING_TTL_SECONDS", "900"))),
@@ -52,7 +57,7 @@ def get_settings() -> Settings:
             float(os.getenv("LLM_TEMPERATURE", "0")) if os.getenv("LLM_TEMPERATURE", "0").strip() else None
         ),
         llm_timeout_seconds=float(os.getenv("LLM_TIMEOUT_SECONDS", "30")),
-        member_api_base=os.getenv("MEMBER_API_BASE", "http://localhost:8090").strip().rstrip("/"),
+        member_api_base=member_api_base,
         tenant_tokens={
             "plan_a": os.getenv("TENANT_TOKEN_PLAN_A", "").strip(),
             "plan_b": os.getenv("TENANT_TOKEN_PLAN_B", "").strip(),

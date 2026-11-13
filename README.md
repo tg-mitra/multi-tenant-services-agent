@@ -4,7 +4,9 @@ Governed multi-tenant assistant for member-services reps. See `SPEC.md` for the 
 
 Dev helper: `GET /dev/members` (optional `?tenant=plan_a`) lists the tenants, their products and every member id with plan, coverage status and the eval cases that use that member, so you know what to send to `/conversations`. It returns no names, DOB, SSN or other PHI. It is off unless `DEV_ENDPOINTS_ENABLED=true` in `.env` and it reads the pack files directly (the mock API has no list endpoint), so it is for development only.
 
-Current status: Step 7 (grievances with human confirmation). Ask the assistant to file a grievance: it prepares one and shows a read-back (nothing is filed). Reply "confirm" in your next message to file it, or "cancel". Filing happens exactly once, even if the grievance system answers 503 or you confirm twice. Details in `SPEC.md` (Step 7).
+Current status: Step 8 (provider directory). Ask for an in-network dermatologist, cardiologist, etc. near the member: results come only from the member's own plan network, near their home ZIP area (or a ZIP the rep names), and no member data is sent to the vendor. Needs `DIRECTORY_API_KEY` in `.env`.
+
+Earlier: Step 7 (grievances with human confirmation). Ask the assistant to file a grievance: it prepares one and shows a read-back (nothing is filed). Reply "confirm" in your next message to file it, or "cancel". Filing happens exactly once, even if the grievance system answers 503 or you confirm twice. Details in `SPEC.md` (Step 7).
 
 Earlier: Step 6 (plan documents + calculators). The assistant now answers what a member pays (searching only that member's own plan documents, for the right plan year), how much deductible, out-of-pocket and physical therapy visits are left, appeal windows and grievance deadlines (calculated in code, not by the model), and flags terminated coverage. Needs the `kb/` folder (set `PACK_DIR` or `KB_DIR`). Some eval cases disagree with the data; see `SPEC.md` finding F-24.
 

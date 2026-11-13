@@ -98,8 +98,19 @@ async def propose_grievance(
     return await _gw(config).propose_grievance(category, description, expedite_requested)
 
 
+@tool
+async def find_providers(
+    specialty: str, config: RunnableConfig, zip_code: str | None = None, limit: int = 5
+) -> dict:
+    """Find IN-NETWORK providers for this member (their own plan's network only). `specialty` is one of:
+    Behavioral Health, Cardiology, Dermatology, Endocrinology, Family Medicine, Gastroenterology,
+    Orthopedic Surgery, Physical Therapy. Leave `zip_code` empty to search near the member's home ZIP
+    (use it only if the rep names a ZIP code). `limit` 1-10, default 5."""
+    return await _gw(config).find_providers(specialty, zip_code, limit)
+
+
 TOOLS = [
     get_member_summary, get_benefits, list_claims, get_claim, verify_caller,
     search_plan_documents, get_plan_status, check_appeal_window, list_grievances, check_grievance_deadline,
-    propose_grievance,
+    propose_grievance, find_providers,
 ]

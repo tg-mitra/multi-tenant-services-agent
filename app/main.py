@@ -6,12 +6,15 @@ Do not use real member data until the PHI filter (Step 5) exists.
 """
 from __future__ import annotations
 
+import logging
 from typing import Literal, Optional
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from app.agent.graph import LLMNotConfigured, run_turn
+
+log = logging.getLogger("uvicorn.error")
 
 app = FastAPI(title="Member Services Agent", version="0.1.0")
 
@@ -38,7 +41,16 @@ async def conversations(req: ConversationRequest) -> ConversationResponse:
         reply = await run_turn(req.message)
     except LLMNotConfigured:
         raise HTTPException(status_code=503, detail="LLM is not configured")
-    except Exception:
-        # Never echo upstream details or the user's text back.
+    except Exception as exc:
+        # Log only the error class and provider status/code to the server console
+        # (no message text, no prompt). Never echo upstream details to the client.
+        body = getattr(exc, "body", None)
+        code = body.get("code") if isinstance(body, dict) else None
+        log.error(
+            "LLM call failed: type=%s status=%s code=%s",
+            type(exc).__name__,
+            getattr(exc, "status_code", None),
+            code,
+        )
         raise HTTPException(status_code=502, detail="LLM request failed")
     return ConversationResponse(reply=reply)

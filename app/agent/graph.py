@@ -24,10 +24,11 @@ def _build_model(settings: Settings) -> ChatOpenAI:
     kwargs: dict = {
         "model": settings.openai_model,
         "api_key": settings.openai_api_key,
-        "temperature": settings.llm_temperature,
         "timeout": settings.llm_timeout_seconds,
         "max_retries": 1,
     }
+    if settings.llm_temperature is not None:
+        kwargs["temperature"] = settings.llm_temperature
     if settings.openai_base_url:
         kwargs["base_url"] = settings.openai_base_url
     return ChatOpenAI(**kwargs)

@@ -29,18 +29,12 @@ Thumbs.db
 .idea/
 .vscode/
 
-# Postman collection for local import (never commit)
-postman_import/
-
 # Local test data derived from the pack (never commit)
 test_data/
 
-# All Postman collections and Postman workspace-sync folders
-*.postman_collection.json
-*postman_collection*.json
+# Postman's own local workspace-sync metadata (not the collection file we commit)
 .postman/
 postman/
-postman_import/
 
 # Evaluation: raw transcripts and subset runs stay local (the report and results are committed)
 reports/transcripts/

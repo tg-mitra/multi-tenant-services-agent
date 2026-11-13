@@ -211,8 +211,22 @@ class ToolGateway:
         return _err("unavailable", f"{what} is temporarily unavailable.")
 
     # ---- projections (minimum data the model needs) ------------------------
-    @staticmethod
-    def _claim_view(c: dict) -> dict:
+    def _denial_view(self, denial) -> dict | None:
+        """The denial code and description, plus THIS tenant's own explanation of the code (the claim-code
+        table in its plan documents: what to tell the member). Looked up in code, so it costs no model call."""
+        if not isinstance(denial, dict):
+            return denial
+        out = dict(denial)
+        try:
+            row = self._kb().all_products_row(self.ctx.tenant, str(denial.get("carc") or ""),
+                                              int(self.settings.as_of_date[:4])) if denial.get("carc") else None
+            if row is not None and len(row.cells) >= 3:
+                out["plan_explanation"] = row.cells[2]
+        except Exception:
+            pass  # the explanation is a bonus: never break a claim answer for it
+        return out
+
+    def _claim_view(self, c: dict) -> dict:
         provider = c.get("provider") or {}
         return {
             "claim_id": c.get("claim_id"),
@@ -227,7 +241,7 @@ class ToolGateway:
             "allowed_amount": c.get("allowed_amount"),
             "plan_paid": c.get("plan_paid"),
             "member_responsibility": c.get("member_responsibility"),
-            "denial": c.get("denial"),
+            "denial": self._denial_view(c.get("denial")),
         }
 
     # ---- tools ------------------------------------------------------------
@@ -363,7 +377,8 @@ class ToolGateway:
     def _coverage_note(ben: dict) -> dict:
         if ben.get("coverage_status") == "TERMINATED":
             return {"coverage_note": f"Coverage is NOT active: it ended on {ben.get('coverage_termination')}. "
-                                     "Do not quote costs as if the member were covered."}
+                                     "Say that, with the date. Benefit costs are not provided for a member whose "
+                                     "coverage has ended. For what was charged on past services, use the member's claims."}
         return {}
 
     @_filtered
@@ -378,7 +393,13 @@ class ToolGateway:
         if ben is None:
             return self._failure(status, "The member's plan")
         try:
-            passages = self._kb().search(self.ctx.tenant, ben["product_code"], year, query, self.settings.rag_top_k)
+            terminated = ben.get("coverage_status") == "TERMINATED"
+            passages = self._kb().search(self.ctx.tenant, ben["product_code"], year, query,
+                                         self.settings.rag_top_k * (4 if terminated else 1))
+            if terminated:
+                # No benefit costs for a member whose coverage has ended: there is nothing to quote wrongly.
+                # General rules (member services guide, claim codes) still apply, e.g. appeal windows.
+                passages = [c for c in passages if c.product_code == "ALL"][: self.settings.rag_top_k]
         except Exception:
             log.error("gateway tool=search_plan_documents conv=%s kb_error", self.ctx.conversation_id)
             return _err("unavailable", "The plan documents are temporarily unavailable.")
@@ -658,6 +679,13 @@ class ToolGateway:
 
     async def ensure_benefits(self) -> None:
         await self._load_benefits()
+
+    async def member_status(self) -> int:
+        """HTTP-style status of looking up the session member in the session tenant: 200 exists, 404 is NOT a
+        member of this tenant, anything else (0, 5xx...) means we could not tell. The benefits record fetched
+        here is cached for the tools, so a normal conversation costs no extra call."""
+        status, _ = await self._load_benefits()
+        return status
 
     # ---- provider directory (Step 8) ---------------------------------------------------------
     # Our own wrapper around the third-party directory. The vendor's tool manifest is NOT used: its

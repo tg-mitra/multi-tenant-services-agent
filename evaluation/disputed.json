@@ -1,0 +1,19 @@
+{
+  "_comment": "Eval cases whose expected facts in the supplied pack contradict the pack's own data or the tenant-isolation requirement. They are scored twice: against the pack's expected facts (reported, not gated) and against the corrected facts below, which are derived from the data (gated). Each reason shows the evidence. Do not edit to make the agent pass.",
+  "EV-23": {
+    "reason": "The pack expects Prairie Sky's Virtual Care text ($0 copay, up to 20 sessions) for a Harborview (plan_a) member. That text is in a file stored under kb/plan_a/ whose own front-matter says tenant plan_b. Giving it to plan_a would leak another tenant's benefits (NFR-4). Harborview's own plan document says $25 copay for a behavioral health visit, in person or virtual.",
+    "corrected_facts": ["$25 copay"]
+  },
+  "EV-25": {
+    "reason": "The pack expects $2,830.88. The member is on Silver HMO with 2026 accumulators of $169.12 met; the 2026 deductible is $2,500, so $2,330.88 remains. $2,830.88 is the 2027 deductible ($3,000) minus the 2026 amount (mixed plan years).",
+    "corrected_facts": ["$2,330.88"]
+  },
+  "EV-34": {
+    "reason": "The pack expects PAID. The claims API returns DENIED (CARC CO-16) for this claim, and the plan's own claim-code table gives CO-16 as a billing error the provider must correct.",
+    "corrected_facts": ["DENIED", "CO-16"]
+  },
+  "EV-37": {
+    "reason": "The pack expects '$10 copay after deductible', which is the Value HDHP wording. This member is on Choice PPO, whose 2026 plan document says generic drugs are a $15 copay.",
+    "corrected_facts": ["$15 copay"]
+  }
+}

@@ -213,6 +213,17 @@ class KnowledgeBase:
             "source": ded.doc_id, "product": ded.product,
         }
 
+    def all_products_row(self, tenant: str, label_prefix: str, plan_year: int) -> Chunk | None:
+        """A table row of this tenant's documents that apply to every product (member services guide, claim
+        codes), newest plan year not after `plan_year`. Used where no product is needed (denial codes)."""
+        best: Chunk | None = None
+        for c in self.chunks:
+            if (c.tenant == tenant and c.product_code == "ALL" and c.kind == "row" and c.plan_year <= plan_year
+                    and c.label.lower().startswith(label_prefix.lower())):
+                if best is None or c.plan_year > best.plan_year:
+                    best = c
+        return best
+
     def rule_days(self, tenant: str, product_code: str, plan_year: int, label_prefix: str) -> tuple[int, str]:
         """Number of calendar days in a member-services-guide rule, plus the document it came from."""
         c = self._row(tenant, product_code, plan_year, label_prefix)

@@ -1,0 +1,74 @@
+name: ci
+
+# Three jobs:
+#   tests          always. Unit and integration tests. No API key, no pack, no network.
+#   committed-gate always. The committed evaluation results must still satisfy the regression gate
+#                  (reads reports/eval_results.json; no model, no pack). Catches thresholds or results being
+#                  edited so the gate would fail, and tests the gate itself on every push.
+#   live-eval      only when the repository variable RUN_LIVE_EVAL is "true". Runs the 40 cases against the real
+#                  model and the mock, rewrites the report, and fails the build if quality dropped.
+#                  It needs the supplied pack (NOT in this repository) and secrets; see the comments below.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m pytest -q
+
+  committed-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m evaluation.gate
+
+  live-eval:
+    if: ${{ vars.RUN_LIVE_EVAL == 'true' }}
+    runs-on: ubuntu-latest
+    env:
+      # The pack is private to the client. Put it at this path before the run (for example by downloading a
+      # private artifact in the step below). It must contain mock_services/, kb/ and eval/conversations.json.
+      PACK_DIR: ${{ github.workspace }}/pack
+      MEMBER_API_BASE: http://localhost:8090
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+      LLM_TEMPERATURE: ${{ vars.LLM_TEMPERATURE }}
+      LLM_INPUT_COST_PER_MILLION: ${{ vars.LLM_INPUT_COST_PER_MILLION }}
+      LLM_OUTPUT_COST_PER_MILLION: ${{ vars.LLM_OUTPUT_COST_PER_MILLION }}
+      TENANT_TOKEN_PLAN_A: ${{ secrets.TENANT_TOKEN_PLAN_A }}
+      TENANT_TOKEN_PLAN_B: ${{ secrets.TENANT_TOKEN_PLAN_B }}
+      DIRECTORY_API_KEY: ${{ secrets.DIRECTORY_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      # - name: Fetch the supplied pack (replace with how you store it)
+      #   run: ./scripts/fetch_pack.sh "$PACK_DIR"
+      - name: Start the mock service
+        run: |
+          python "$PACK_DIR/mock_services/server.py" --port 8090 &
+          for i in $(seq 1 20); do curl -fs http://localhost:8090/health && break; sleep 1; done
+      - name: Evaluate and apply the regression gate
+        run: python -m evaluation.run_eval
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-report
+          path: |
+            reports/eval_report.md
+            reports/eval_results.json

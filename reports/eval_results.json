@@ -1,0 +1,1184 @@
+{
+  "meta": {
+    "run_at": "2026-11-13T10:26:52+00:00",
+    "wall_seconds": 84.6,
+    "git_commit": "c04d791+uncommitted",
+    "model": "gpt-6-luna",
+    "as_of": "2026-11-15",
+    "cases_file": "conversations.json",
+    "concurrency": 4,
+    "prices_per_million": {
+      "input": 0.1,
+      "output": 0.5
+    },
+    "subset": false
+  },
+  "metrics": {
+    "cases": 40,
+    "pack_passed": 36,
+    "data_passed": 40,
+    "disputed": [
+      "EV-23",
+      "EV-25",
+      "EV-34",
+      "EV-37"
+    ],
+    "by_behaviour": {
+      "answer": {
+        "total": 31,
+        "passed": 31,
+        "pack_passed": 27
+      },
+      "answer_no_write": {
+        "total": 1,
+        "passed": 1,
+        "pack_passed": 1
+      },
+      "confirm_then_file": {
+        "total": 2,
+        "passed": 2,
+        "pack_passed": 2
+      },
+      "no_write": {
+        "total": 1,
+        "passed": 1,
+        "pack_passed": 1
+      },
+      "decline": {
+        "total": 1,
+        "passed": 1,
+        "pack_passed": 1
+      },
+      "not_in_tenant": {
+        "total": 2,
+        "passed": 2,
+        "pack_passed": 2
+      },
+      "cannot_answer": {
+        "total": 1,
+        "passed": 1,
+        "pack_passed": 1
+      },
+      "coverage_terminated": {
+        "total": 1,
+        "passed": 1,
+        "pack_passed": 1
+      }
+    },
+    "hard_failures": [],
+    "hard_failure_kinds": {},
+    "latency_ms": {
+      "turns": 43,
+      "p50": 5510.0,
+      "p95": 13045.0,
+      "max": 16911.0
+    },
+    "cost_usd": {
+      "avg_per_conversation": 0.00059296,
+      "max": 0.0018737,
+      "projected_per_day_at_20k": 11.86
+    },
+    "avg_model_calls": 2.35,
+    "avg_tool_calls": 1.48,
+    "gateway_denials": 0,
+    "budget_stops": 0,
+    "http_errors": 0
+  },
+  "cases": [
+    {
+      "id": "EV-01",
+      "tenant": "plan_a",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        4755
+      ],
+      "cost_usd": 0.0004977,
+      "model_calls": 2,
+      "tool_calls": 2,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-02",
+      "tenant": "plan_a",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        4657
+      ],
+      "cost_usd": 0.0005075,
+      "model_calls": 2,
+      "tool_calls": 2,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-03",
+      "tenant": "plan_a",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        4160
+      ],
+      "cost_usd": 0.0004359,
+      "model_calls": 2,
+      "tool_calls": 1,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-04",
+      "tenant": "plan_a",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        4448
+      ],
+      "cost_usd": 0.0004383,
+      "model_calls": 2,
+      "tool_calls": 1,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-05",
+      "tenant": "plan_a",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        4053
+      ],
+      "cost_usd": 0.000432,
+      "model_calls": 2,
+      "tool_calls": 1,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-06",
+      "tenant": "plan_a",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        6211
+      ],
+      "cost_usd": 0.0007137,
+      "model_calls": 3,
+      "tool_calls": 2,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-07",
+      "tenant": "plan_a",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        7274
+      ],
+      "cost_usd": 0.0007085,
+      "model_calls": 3,
+      "tool_calls": 2,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-08",
+      "tenant": "plan_a",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        5074
+      ],
+      "cost_usd": 0.0004736,
+      "model_calls": 2,
+      "tool_calls": 1,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-09",
+      "tenant": "plan_a",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        8837
+      ],
+      "cost_usd": 0.000446,
+      "model_calls": 2,
+      "tool_calls": 1,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-10",
+      "tenant": "plan_a",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        11866
+      ],
+      "cost_usd": 0.0010187,
+      "model_calls": 3,
+      "tool_calls": 2,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-11",
+      "tenant": "plan_a",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        16824
+      ],
+      "cost_usd": 0.0018737,
+      "model_calls": 5,
+      "tool_calls": 4,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-12",
+      "tenant": "plan_a",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        16911
+      ],
+      "cost_usd": 0.001407,
+      "model_calls": 4,
+      "tool_calls": 3,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-13",
+      "tenant": "plan_a",
+      "behaviour": "answer_no_write",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        7488
+      ],
+      "cost_usd": 0.000442,
+      "model_calls": 2,
+      "tool_calls": 1,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-14",
+      "tenant": "plan_a",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        11449
+      ],
+      "cost_usd": 0.0007087,
+      "model_calls": 3,
+      "tool_calls": 2,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-15",
+      "tenant": "plan_a",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        4338
+      ],
+      "cost_usd": 0.0004454,
+      "model_calls": 2,
+      "tool_calls": 1,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-16",
+      "tenant": "plan_a",
+      "behaviour": "confirm_then_file",
+      "turns": 2,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        10925,
+        553
+      ],
+      "cost_usd": 0.0007227,
+      "model_calls": 3,
+      "tool_calls": 2,
+      "http_statuses": [
+        200,
+        200
+      ],
+      "new_grievances": 1,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-17",
+      "tenant": "plan_a",
+      "behaviour": "no_write",
+      "turns": 2,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        10609,
+        12
+      ],
+      "cost_usd": 0.0008623,
+      "model_calls": 3,
+      "tool_calls": 2,
+      "http_statuses": [
+        200,
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-18",
+      "tenant": "plan_a",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        4276
+      ],
+      "cost_usd": 0.0004172,
+      "model_calls": 2,
+      "tool_calls": 1,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-19",
+      "tenant": "plan_a",
+      "behaviour": "decline",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        2639
+      ],
+      "cost_usd": 0.0002136,
+      "model_calls": 1,
+      "tool_calls": 0,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-20",
+      "tenant": "plan_a",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        4516
+      ],
+      "cost_usd": 0.0004583,
+      "model_calls": 2,
+      "tool_calls": 1,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-21",
+      "tenant": "plan_a",
+      "behaviour": "not_in_tenant",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        283
+      ],
+      "cost_usd": 0.0,
+      "model_calls": 0,
+      "tool_calls": 0,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-22",
+      "tenant": "plan_a",
+      "behaviour": "cannot_answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        2328
+      ],
+      "cost_usd": 0.0002241,
+      "model_calls": 1,
+      "tool_calls": 0,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-23",
+      "tenant": "plan_a",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": true,
+      "dispute_reason": "The pack expects Prairie Sky's Virtual Care text ($0 copay, up to 20 sessions) for a Harborview (plan_a) member. That text is in a file stored under kb/plan_a/ whose own front-matter says tenant plan_b. Giving it to plan_a would leak another tenant's benefits (NFR-4). Harborview's own plan document says $25 copay for a behavioral health visit, in person or virtual.",
+      "pack_pass": false,
+      "data_pass": true,
+      "pack_missing_facts": [
+        "$0 copay",
+        "up to 20 sessions per plan year"
+      ],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        6031
+      ],
+      "cost_usd": 0.0007235,
+      "model_calls": 3,
+      "tool_calls": 2,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-24",
+      "tenant": "plan_a",
+      "behaviour": "coverage_terminated",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        7318
+      ],
+      "cost_usd": 0.0006839,
+      "model_calls": 3,
+      "tool_calls": 2,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-25",
+      "tenant": "plan_a",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": true,
+      "dispute_reason": "The pack expects $2,830.88. The member is on Silver HMO with 2026 accumulators of $169.12 met; the 2026 deductible is $2,500, so $2,330.88 remains. $2,830.88 is the 2027 deductible ($3,000) minus the 2026 amount (mixed plan years).",
+      "pack_pass": false,
+      "data_pass": true,
+      "pack_missing_facts": [
+        "$2,830.88"
+      ],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        4136
+      ],
+      "cost_usd": 0.0004397,
+      "model_calls": 2,
+      "tool_calls": 1,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-26",
+      "tenant": "plan_b",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        4796
+      ],
+      "cost_usd": 0.0004966,
+      "model_calls": 2,
+      "tool_calls": 2,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-27",
+      "tenant": "plan_b",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        5921
+      ],
+      "cost_usd": 0.0006854,
+      "model_calls": 3,
+      "tool_calls": 2,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-28",
+      "tenant": "plan_b",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        5741
+      ],
+      "cost_usd": 0.0007282,
+      "model_calls": 3,
+      "tool_calls": 2,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-29",
+      "tenant": "plan_b",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        13045
+      ],
+      "cost_usd": 0.0009479,
+      "model_calls": 3,
+      "tool_calls": 2,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-30",
+      "tenant": "plan_b",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        4451
+      ],
+      "cost_usd": 0.0005225,
+      "model_calls": 2,
+      "tool_calls": 1,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-31",
+      "tenant": "plan_b",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        7332
+      ],
+      "cost_usd": 0.0004636,
+      "model_calls": 2,
+      "tool_calls": 1,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-32",
+      "tenant": "plan_b",
+      "behaviour": "confirm_then_file",
+      "turns": 2,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        5338,
+        581
+      ],
+      "cost_usd": 0.0004562,
+      "model_calls": 2,
+      "tool_calls": 1,
+      "http_statuses": [
+        200,
+        200
+      ],
+      "new_grievances": 1,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-33",
+      "tenant": "plan_b",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        5908
+      ],
+      "cost_usd": 0.0007065,
+      "model_calls": 3,
+      "tool_calls": 2,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-34",
+      "tenant": "plan_b",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": true,
+      "dispute_reason": "The pack expects PAID. The claims API returns DENIED (CARC CO-16) for this claim, and the plan's own claim-code table gives CO-16 as a billing error the provider must correct.",
+      "pack_pass": false,
+      "data_pass": true,
+      "pack_missing_facts": [
+        "PAID"
+      ],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        6705
+      ],
+      "cost_usd": 0.0004659,
+      "model_calls": 2,
+      "tool_calls": 1,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-35",
+      "tenant": "plan_b",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        3934
+      ],
+      "cost_usd": 0.0004319,
+      "model_calls": 2,
+      "tool_calls": 1,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-36",
+      "tenant": "plan_b",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        5510
+      ],
+      "cost_usd": 0.0004349,
+      "model_calls": 2,
+      "tool_calls": 1,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-37",
+      "tenant": "plan_b",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": true,
+      "dispute_reason": "The pack expects '$10 copay after deductible', which is the Value HDHP wording. This member is on Choice PPO, whose 2026 plan document says generic drugs are a $15 copay.",
+      "pack_pass": false,
+      "data_pass": true,
+      "pack_missing_facts": [
+        "$10 copay after deductible"
+      ],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        6152
+      ],
+      "cost_usd": 0.0006826,
+      "model_calls": 3,
+      "tool_calls": 2,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-38",
+      "tenant": "plan_b",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        8077
+      ],
+      "cost_usd": 0.000692,
+      "model_calls": 3,
+      "tool_calls": 2,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-39",
+      "tenant": "plan_b",
+      "behaviour": "not_in_tenant",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        283
+      ],
+      "cost_usd": 0.0,
+      "model_calls": 0,
+      "tool_calls": 0,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    },
+    {
+      "id": "EV-40",
+      "tenant": "plan_a",
+      "behaviour": "answer",
+      "turns": 1,
+      "disputed": false,
+      "dispute_reason": null,
+      "pack_pass": true,
+      "data_pass": true,
+      "pack_missing_facts": [],
+      "data_missing_facts": [],
+      "notes": [],
+      "hard_failures": [],
+      "latency_ms": [
+        11115
+      ],
+      "cost_usd": 0.0007102,
+      "model_calls": 3,
+      "tool_calls": 2,
+      "http_statuses": [
+        200
+      ],
+      "new_grievances": 0,
+      "gateway_denials": 0,
+      "budget_stops": 0,
+      "error": null
+    }
+  ]
+}

@@ -48,6 +48,10 @@ class TurnResult:
     budget: dict = field(default_factory=dict)
 
 
+MEMBER_NOT_FOUND_TEXT = ("I couldn't find that member for this plan, so I can't look up any information. "
+                         "Please check the member ID and the plan with the caller.")
+
+
 def _event(kind: str, **extra) -> dict:
     return {"type": kind, "at": iso(now()), **extra}
 
@@ -176,8 +180,16 @@ async def process_turn(
             model_message, _ = redact_text(req.message, skip={"dob", "ssn_last4"})
         try:
             async with ToolGateway(ctx, settings, idem_store=idem, budget=budget, trace=trace) as gw:
-                reply = await run_turn(model_message, history, gateway=gw, extra_system=extra_system,
-                                       budget=budget, trace=trace)
+                # A member who is not in this tenant is answered by code, before any model runs (NFR-4):
+                # nothing about the member is returned and no other tenant is mentioned.
+                if await gw.member_status() == 404:
+                    path = "member_not_found"
+                    trace.decision("member", "not_found", reason="not_a_member_of_this_tenant")
+                    reply = MEMBER_NOT_FOUND_TEXT
+                    used_model = False
+                else:
+                    reply = await run_turn(model_message, history, gateway=gw, extra_system=extra_system,
+                                           budget=budget, trace=trace)
                 if gw.proposal and not budget.stopped_by:  # the model prepared a grievance: fixed read-back
                     reply = f"{reply.strip()}\n\n{readback_text(gw.proposal)}"
                     new_pending, new_event = gw.proposal, _event("proposed")

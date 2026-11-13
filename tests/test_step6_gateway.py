@@ -87,6 +87,16 @@ def test_search_flags_terminated_coverage(kb_dir):
     assert res["coverage_status"] == "TERMINATED" and "2026-08-31" in res["coverage_note"]
 
 
+def test_terminated_members_get_no_benefit_costs_to_quote_but_still_get_general_rules(kb_dir):
+    r = {"/benefits": (200, _benefits("GPPO", status="TERMINATED", term="2026-08-31"))}
+    costs, _ = _run(r, lambda gw: gw.search_plan_documents("specialist visit copay"), kb_dir)
+    assert costs["passages"] == [] and "$40" not in json.dumps(costs) and "2026-08-31" in costs["coverage_note"]
+    rules, _ = _run(r, lambda gw: gw.search_plan_documents("grievance resolution timeframe"), kb_dir)
+    assert rules["passages"] and all(p["source"] == "member_services_guide.md" for p in rules["passages"])
+    active, _ = _run({"/benefits": (200, _benefits("GPPO"))}, lambda gw: gw.search_plan_documents("specialist visit copay"), kb_dir)
+    assert "$40" in json.dumps(active)  # an active member still gets the costs
+
+
 def test_search_validates_input_without_calling_the_api(kb_dir):
     for kwargs in [{"query": ""}, {"query": "x" * 201}, {"query": "ok", "plan_year": "2026"},
                    {"query": "ok", "plan_year": 1999}, {"query": "ok", "plan_year": True}]:

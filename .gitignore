@@ -41,3 +41,7 @@ test_data/
 .postman/
 postman/
 postman_import/
+
+# Evaluation: raw transcripts and subset runs stay local (the report and results are committed)
+reports/transcripts/
+reports/subset/

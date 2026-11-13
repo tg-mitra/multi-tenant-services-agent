@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -16,6 +17,7 @@ class Settings:
     openai_base_url: str | None
     llm_temperature: float | None  # None = use the model's default
     llm_timeout_seconds: float
+    state_dir: Path
 
 
 def get_settings() -> Settings:
@@ -27,4 +29,5 @@ def get_settings() -> Settings:
             float(os.getenv("LLM_TEMPERATURE", "0")) if os.getenv("LLM_TEMPERATURE", "0").strip() else None
         ),
         llm_timeout_seconds=float(os.getenv("LLM_TIMEOUT_SECONDS", "30")),
+        state_dir=Path(os.getenv("STATE_DIR", "./state").strip() or "./state"),
     )

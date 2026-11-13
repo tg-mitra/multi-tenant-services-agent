@@ -302,6 +302,23 @@ state/{tenant}/audit/{yyyy-mm-dd}.jsonl             append-only events
 
 The supplied `data/` folder is **not** used for state (it holds the pack and is git-ignored/swappable). `member_id` becomes a folder name, so it is validated against a strict pattern (`^M\d{6}$`) and the resolved path must stay inside `STATE_DIR` (no path traversal). A conversation file is created after the first LLM response and named by the generated `conversation_id`.
 
+Step 2 file format (`state/{tenant}/{member_id}/{conversation_id}.json`):
+
+```json
+{
+  "conversation_id": "<uuid hex>",
+  "tenant": "plan_a",
+  "member_id": "M749817",
+  "created_at": "2026-11-13T10:00:00+00:00",
+  "updated_at": "2026-11-13T10:02:10+00:00",
+  "turns": [
+    {"turn": 1, "ts": "...", "rep": "<rep message>", "assistant": "<reply>", "model": "<model>", "latency_ms": 1234}
+  ]
+}
+```
+
+Timestamps are real UTC time (not the fixed as-of date). Writes are atomic (temp file + `os.replace`) and serialised per conversation with an in-process lock. Later steps add fields (summary, pending action, budgets) to the same file.
+
 Rules: atomic write (temp file + `os.replace`), per-conversation lock, idempotency record written before the POST, no raw PHI stored, directory git-ignored. Single-process only; MySQL (or the managed SQL service of the chosen cloud) is the production replacement.
 
 ## 8. Configuration (environment)
@@ -327,7 +344,12 @@ Rules: atomic write (temp file + `os.replace`), per-conversation lock, idempoten
 
 ## 9. API contract (summary)
 
-- `POST /conversations` body `{tenant, member_id, message, conversation_id?}`. No `conversation_id` starts a new conversation; an existing one continues it (follow-ups, confirmations). Returns `{conversation_id, reply, state: {pending_confirmation: bool}, budget: {...}}`. A `conversation_id` that does not belong to the given tenant and member returns 404. In the POC the tenant comes from the request (later: an authenticated rep identity mapped to a tenant; production would use the IdP's token claims).
+- `POST /conversations` body `{tenant, member_id, message, conversation_id?}`.
+  - **`conversation_id` is optional on the first call.** If it is missing, `null`, blank (`""`) or `0`/`"0"`, the server starts a new conversation and generates the id (UUID4 hex, 32 chars).
+  - **Every response carries `conversation_id`.** Success: `{conversation_id, reply}` (later steps add `state: {pending_confirmation: bool}` and `budget: {...}`). Errors from this endpoint: `{detail, conversation_id}`, where `conversation_id` is the existing conversation's id, or `null` when no conversation exists (a brand-new conversation whose first LLM call failed has no file, so no id is returned; a 404 never echoes an id). The client sends the returned id back on every later call to continue the conversation. (FastAPI's own 422 validation errors use FastAPI's standard format.)
+  - A supplied id must match `^[A-Za-z0-9_-]{1,64}$` (it becomes a file name), otherwise 422.
+  - A supplied id that does not exist for the given tenant and member returns **404** `Conversation not found`. The server never creates a conversation under a client-chosen id. An id that belongs to another tenant or member also returns 404, with no hint that it exists elsewhere.
+  - The conversation file is written only after the LLM has replied. If the LLM call fails, nothing is written and the failed turn is not recorded. In the POC the tenant comes from the request (later: an authenticated rep identity mapped to a tenant; production would use the IdP's token claims).
 - `GET /conversations/{id}/trace` (from Step 9).
 - Errors never echo PHI. A request for a conversation of another tenant returns 404.
 - A CLI wrapper (`python -m app.cli --tenant plan_a --member M123`) for demo.

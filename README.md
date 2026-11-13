@@ -2,7 +2,9 @@
 
 Governed multi-tenant assistant for member-services reps. See `SPEC.md` for the full specification and the step plan.
 
-Current status: Step 1 (basic LangGraph chat endpoint, no filter, no storage).
+Current status: Step 2 (LangGraph chat endpoint, conversations saved as JSON files, no filter yet).
+
+Conversations: leave `conversation_id` out (or send `null`, `""` or `0`) to start a new conversation. Every response returns a `conversation_id`; send it back to continue that conversation. An unknown id returns 404. Files are saved under `state/{tenant}/{member_id}/{conversation_id}.json` (git-ignored; set `STATE_DIR` to change). Until the PHI filter exists, use made-up text only.
 
 ## Setup (Windows PowerShell)
 

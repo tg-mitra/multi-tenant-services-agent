@@ -21,7 +21,9 @@ def test_conversation_returns_reply(monkeypatch):
     monkeypatch.setattr(main, "run_turn", fake)
     r = client.post("/conversations", json=VALID)
     assert r.status_code == 200
-    assert r.json() == {"reply": "echo: Hello"}
+    body = r.json()
+    assert body["reply"] == "echo: Hello"
+    assert body["conversation_id"]  # always present
 
 
 def test_rejects_unknown_tenant():

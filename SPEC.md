@@ -445,7 +445,12 @@ Notes on specific steps:
 
 - **Step 1 deviates deliberately** from the final design (no filter, no storage) to get an end-to-end loop quickly. Raw input must not be logged. Do not use real member data until Step 5 is done.
 - **Step 2** files contain what the rep typed. Until Step 5 they may hold PHI, so `state/` stays git-ignored and Step 5 adds redaction before write.
-- **Step 3** counts exchanges (rep message + reply), not individual messages.
+- **Step 3** counts exchanges (rep message + reply), not individual messages. Implemented behaviour:
+  - On a call with an existing `conversation_id`, the last `HISTORY_TURNS` exchanges are read from the conversation file and sent to the LLM, oldest first, as alternating rep (human) and assistant messages, followed by the new rep message. A new conversation sends no history.
+  - `HISTORY_TURNS` (in `.env`, default 8) of `0` disables history. Negative values are treated as 0.
+  - The window only limits what the LLM sees. The file keeps every turn.
+  - A failed LLM call is not recorded, so it never appears in later history.
+  - No system prompt yet (added in later steps). Exchanges older than the window are dropped for now; Step 11 may condense them.
 - **Step 4** must also enforce the tenant and member from the session, even before the PHI filter exists.
 - **Step 11** summary is context only. Facts (amounts, dates, statuses) are always re-fetched through tools or computed in code, never taken from a summary. The Hugging Face model runs locally, so no extra data leaves the machine, but it adds CPU time against the 3 s p95 target and may drop numbers. Keep it switchable and measure it with the eval before enabling it by default.
 - **LangGraph and confirmation:** LangGraph's checkpoint/interrupt may be used to pause for the rep's confirmation, but the source of truth for "confirmed" stays in the gateway's pending-action state (6.4), so it survives restarts and cannot be set by the model.

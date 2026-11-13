@@ -19,6 +19,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
 from app.agent.graph import LLMNotConfigured, run_turn
+from app.agent.history import turns_to_messages
 from app.config import get_settings
 from app.store.jsonfile import CONVERSATION_ID_RE, JsonConversationStore
 
@@ -74,21 +75,24 @@ async def conversations(req: ConversationRequest):
     store = JsonConversationStore(settings.state_dir)
 
     is_new = req.conversation_id is None
+    history = []
     if is_new:
         conversation_id = new_conversation_id()
     else:
         conversation_id = req.conversation_id
         # Never create a conversation under a client-chosen id. The path includes tenant and
         # member, so another tenant's or member's id is simply "not found" (no hint it exists).
-        if store.load(req.tenant, req.member_id, conversation_id) is None:
+        record = store.load(req.tenant, req.member_id, conversation_id)
+        if record is None:
             return _error(404, "Conversation not found", None)
+        history = turns_to_messages(record["turns"], settings.history_turns)
 
     # On failure a brand-new conversation has no file yet, so its id is not returned.
     known_id = None if is_new else conversation_id
 
     started = time.perf_counter()
     try:
-        reply = await run_turn(req.message)
+        reply = await run_turn(req.message, history)
     except LLMNotConfigured:
         return _error(503, "LLM is not configured", known_id)
     except Exception as exc:

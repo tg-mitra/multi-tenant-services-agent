@@ -54,9 +54,10 @@ def get_graph():
     return build_graph()
 
 
-async def run_turn(message: str) -> str:
-    """Send one rep message through the graph and return the model's text reply."""
-    result = await get_graph().ainvoke({"messages": [HumanMessage(content=message)]})
+async def run_turn(message: str, history: list[BaseMessage] | None = None) -> str:
+    """Send one rep message (after any earlier exchanges) through the graph; return the text reply."""
+    messages = [*(history or []), HumanMessage(content=message)]
+    result = await get_graph().ainvoke({"messages": messages})
     last: BaseMessage = result["messages"][-1]
     content = last.content
     if isinstance(content, list):  # some providers return content blocks

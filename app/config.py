@@ -18,6 +18,7 @@ class Settings:
     llm_temperature: float | None  # None = use the model's default
     llm_timeout_seconds: float
     state_dir: Path
+    history_turns: int  # most recent exchanges (rep message + reply) sent to the LLM; 0 = none
 
 
 def get_settings() -> Settings:
@@ -29,5 +30,6 @@ def get_settings() -> Settings:
             float(os.getenv("LLM_TEMPERATURE", "0")) if os.getenv("LLM_TEMPERATURE", "0").strip() else None
         ),
         llm_timeout_seconds=float(os.getenv("LLM_TIMEOUT_SECONDS", "30")),
+        history_turns=max(0, int(os.getenv("HISTORY_TURNS", "8").strip() or "8")),
         state_dir=Path(os.getenv("STATE_DIR", "./state").strip() or "./state"),
     )

@@ -2,7 +2,9 @@
 
 Governed multi-tenant assistant for member-services reps. See `SPEC.md` for the full specification and the step plan.
 
-Current status: Step 2 (LangGraph chat endpoint, conversations saved as JSON files, no filter yet).
+Current status: Step 3 (LangGraph chat endpoint, conversations saved as JSON files, last `HISTORY_TURNS` exchanges sent to the LLM for follow-ups, no filter yet).
+
+Follow-ups: when you send an existing `conversation_id`, the last `HISTORY_TURNS` exchanges (default 8, set in `.env`; 0 turns it off) are sent to the model with your new message. The file always keeps the full conversation; the setting only limits what the model sees.
 
 Conversations: leave `conversation_id` out (or send `null`, `""` or `0`) to start a new conversation. Every response returns a `conversation_id`; send it back to continue that conversation. An unknown id returns 404. Files are saved under `state/{tenant}/{member_id}/{conversation_id}.json` (git-ignored; set `STATE_DIR` to change). Until the PHI filter exists, use made-up text only.
 

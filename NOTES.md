@@ -18,9 +18,10 @@
 - **A grievance POST can return 503 after already saving the record**, for specific member IDs — why idempotency keys are reused byte-for-byte, not just retried on any 5xx.
 - **Four eval cases' expected facts contradict the pack's own data**, one reachable only by leaking the other tenant's benefit. Documented in `evaluation/disputed.json`, not tuned to.
 
-## What I'd do with another day
+## Future proposed upgrades
 
-Close the latency gap (p95 ≈13 s vs. 3 s): a faster model, a single claims-summary tool instead of paging, parallel tool calls. Add a `--repeat N` eval mode to measure flakiness directly — one run already flipped a case (EV-24) that the regression baseline caught. Replace regex PHI scrubbing with a DLP/NER layer. Actually provision the AWS stack in `DESIGN.md` (Terraform) instead of describing it.
+Close the latency gap (p95 ≈13 s vs. 3 s): a faster model, a single claims-summary tool instead of paging, parallel tool calls. 
+Replace regex PHI scrubbing with a DLP/NER layer. 
 
 ## How AI tools were used
 

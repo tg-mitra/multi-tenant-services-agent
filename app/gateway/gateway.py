@@ -26,12 +26,15 @@ from urllib.parse import parse_qs, urlparse
 
 import httpx
 
+from app.calc import deadline_status, fmt_money, money_line, parse_date
 from app.config import Settings
 from app.gateway.phi import sanitize_result
+from app.rag.kb import KbLookupError, KnowledgeBase, get_kb
 
 log =logging.getLogger("uvicorn.error")
 
 CLAIM_ID_RE = re.compile(r"^C\d{6,12}$")
+GRIEVANCE_ID_RE = re.compile(r"^G\d{2}-\d{6}$")
 MAX_CURSOR = 100_000
 PAGE_SIZE = 5
 
@@ -63,9 +66,17 @@ def _filtered(fn):
 
 
 class ToolGateway:
-    def __init__(self, ctx: SessionContext, settings: Settings, client: httpx.AsyncClient | None = None):
+    def __init__(
+        self,
+        ctx: SessionContext,
+        settings: Settings,
+        client: httpx.AsyncClient | None = None,
+        kb: KnowledgeBase | None = None,
+    ):
         self.ctx = ctx
         self.settings = settings
+        self._kb_obj = kb
+        self._benefits: dict | None = None  # benefits record, fetched at most once per rep message
         self._client = client
         self._owns_client = client is None
         self._verify_calls = 0
@@ -164,9 +175,18 @@ class ToolGateway:
             "coverage_termination": data.get("coverage_termination"),
         }
 
+    async def _load_benefits(self) -> tuple[int, dict | None]:
+        """Benefits record (product, coverage status, accumulators), fetched once and reused."""
+        if self._benefits is None:
+            status, data = await self._get("get_benefits", self._member_path("/benefits"))
+            if data is None:
+                return status, None
+            self._benefits = data
+        return 200, self._benefits
+
     @_filtered
     async def get_benefits(self) -> dict:
-        status, data = await self._get("get_benefits", self._member_path("/benefits"))
+        status, data = await self._load_benefits()
         if data is None:
             return self._failure(status, "The member's benefits record")
         return {
@@ -248,3 +268,174 @@ class ToolGateway:
             )
             return self._failure(404, "The claim")  # same answer as a missing claim: no hint it exists
         return self._claim_view(data)
+
+    # ---- plan documents and calculators (Step 6) ---------------------------------------
+    def _kb(self) -> KnowledgeBase:
+        if self._kb_obj is None:
+            self._kb_obj = get_kb(str(self.settings.kb_dir))
+        return self._kb_obj
+
+    def _year(self, plan_year) -> int | None:
+        if plan_year is None:
+            return int(self.settings.as_of_date[:4])
+        if isinstance(plan_year, bool) or not isinstance(plan_year, int) or not 2000 <= plan_year <= 2100:
+            return None
+        return plan_year
+
+    @staticmethod
+    def _coverage_note(ben: dict) -> dict:
+        if ben.get("coverage_status") == "TERMINATED":
+            return {"coverage_note": f"Coverage is NOT active: it ended on {ben.get('coverage_termination')}. "
+                                     "Do not quote costs as if the member were covered."}
+        return {}
+
+    @_filtered
+    async def search_plan_documents(self, query: str, plan_year: int | None = None) -> dict:
+        """Passages from this member's own plan documents (tenant + product + plan year enforced here)."""
+        year = self._year(plan_year)
+        if year is None:
+            return _err("invalid_argument", "plan_year must be a year such as 2026 or 2027.")
+        if not isinstance(query, str) or not query.strip() or len(query) > 200:
+            return _err("invalid_argument", "query must be 1 to 200 characters.")
+        status, ben = await self._load_benefits()
+        if ben is None:
+            return self._failure(status, "The member's plan")
+        try:
+            passages = self._kb().search(self.ctx.tenant, ben["product_code"], year, query, self.settings.rag_top_k)
+        except Exception:
+            log.error("gateway tool=search_plan_documents conv=%s kb_error", self.ctx.conversation_id)
+            return _err("unavailable", "The plan documents are temporarily unavailable.")
+        result = {
+            "plan_year": year,
+            "product": ben.get("plan_name"),
+            "coverage_status": ben.get("coverage_status"),
+            "coverage_termination": ben.get("coverage_termination"),
+            "passages": [{"source": c.doc_id, "plan_year": c.plan_year, "text": c.text} for c in passages],
+            **self._coverage_note(ben),
+        }
+        if not passages:
+            result["note"] = ("No matching passage in this member's plan documents for that plan year. "
+                              "Say the information is not available; do not guess.")
+        log.info("gateway tool=search_plan_documents conv=%s year=%s passages=%d",
+                 self.ctx.conversation_id, year, len(passages))
+        return result
+
+    @_filtered
+    async def get_plan_status(self) -> dict:
+        """Deductible / out-of-pocket / PT visits: plan limit (documents) minus amount used (API), in code."""
+        status, ben = await self._load_benefits()
+        if ben is None:
+            return self._failure(status, "The member's benefits record")
+        acc = ben.get("accumulators") or {}
+        year = acc.get("plan_year")
+        if not acc or year is None:
+            return _err("not_available", "No accumulators are on file for this member.")
+        try:
+            lim = self._kb().plan_limits(self.ctx.tenant, ben["product_code"], int(year))
+        except KbLookupError:
+            return _err("not_available", "The plan limits for this plan year are not in the plan documents.")
+        used_pt = int(acc.get("physical_therapy_visits_used") or 0)
+        family = {}
+        if lim["deductible_family"] is not None:
+            family["deductible"] = fmt_money(lim["deductible_family"])
+        if lim["oop_family"] is not None:
+            family["out_of_pocket"] = fmt_money(lim["oop_family"])
+        return {
+            "plan_year": year,
+            "accumulators_as_of": acc.get("as_of"),
+            "product": lim["product"],
+            "coverage_status": ben.get("coverage_status"),
+            "scope": "in-network, individual",
+            "deductible": money_line(lim["deductible_individual"], acc.get("deductible_met_individual", 0)),
+            "out_of_pocket": money_line(lim["oop_individual"], acc.get("out_of_pocket_met_individual", 0)),
+            "physical_therapy_visits": {
+                "limit": lim["pt_visit_limit"],
+                "used": used_pt,
+                "remaining": max(0, lim["pt_visit_limit"] - used_pt),
+            },
+            "family_limits_for_reference": family,
+            "source": lim["source"],
+            **self._coverage_note(ben),
+        }
+
+    @_filtered
+    async def check_appeal_window(self, claim_id: str) -> dict:
+        """Appeal deadline = denial notice date (claim processed date) + the plan's window (from the guide)."""
+        claim = await self.get_claim(claim_id)  # validates the id and enforces claim ownership
+        if "error" in claim:
+            return claim
+        if claim.get("status") != "DENIED":
+            return {"claim_id": claim.get("claim_id"), "status": claim.get("status"), "appeal_applicable": False,
+                    "message": "Only denied claims can be appealed."}
+        notice = claim.get("processed_date")
+        if not notice:
+            return _err("not_available", "The denial notice date (processed date) is not on the claim.")
+        status, ben = await self._load_benefits()
+        if ben is None:
+            return self._failure(status, "The member's plan")
+        try:
+            days, source = self._kb().rule_days(
+                self.ctx.tenant, ben["product_code"], int(self.settings.as_of_date[:4]), "Claim appeal filing window"
+            )
+            res = deadline_status(notice, days, self.settings.as_of_date)
+        except (KbLookupError, ValueError):
+            return _err("not_available", "The appeal window for this plan is not available.")
+        return {
+            "claim_id": claim["claim_id"], "status": "DENIED", "denial": claim.get("denial"),
+            "denial_notice_date": notice, "appeal_window_days": days, "appeal_deadline": res["deadline"],
+            "as_of": res["as_of"], "within_appeal_window": not res["deadline_passed"],
+            "days_remaining": res["days_remaining"], "days_overdue": res["days_overdue"], "source": source,
+        }
+
+    # ---- grievances (read only; filing is Step 7) -----------------------------------------
+    async def _grievances(self) -> tuple[int, list[dict] | None]:
+        status, data = await self._get("list_grievances", self._member_path("/grievances"))
+        if data is None:
+            return status, None
+        return 200, [g for g in data.get("data", []) if g.get("member_id") == self.ctx.member_id]
+
+    @staticmethod
+    def _grievance_view(g: dict) -> dict:  # the free-text description is not passed on
+        return {
+            "grievance_id": g.get("grievance_id"), "category": g.get("category"), "status": g.get("status"),
+            "received_date": g.get("received_date"), "resolved_date": g.get("resolved_date"),
+            "expedite_requested": g.get("expedite_requested"),
+        }
+
+    @_filtered
+    async def list_grievances(self) -> dict:
+        status, items = await self._grievances()
+        if items is None:
+            return self._failure(status, "The member's grievances")
+        return {"grievances": [self._grievance_view(g) for g in items]}
+
+    @_filtered
+    async def check_grievance_deadline(self, grievance_id: str) -> dict:
+        """Resolution deadline = received date + the plan's timeframe (from the guide); tenant-specific."""
+        if not isinstance(grievance_id, str) or not GRIEVANCE_ID_RE.fullmatch(grievance_id.strip()):
+            return _err("invalid_argument", "grievance_id must look like G26-600230.")
+        grievance_id = grievance_id.strip()
+        status, items = await self._grievances()
+        if items is None:
+            return self._failure(status, "The member's grievances")
+        g = next((x for x in items if x.get("grievance_id") == grievance_id), None)
+        if g is None:
+            return self._failure(404, "The grievance")
+        status, ben = await self._load_benefits()
+        if ben is None:
+            return self._failure(status, "The member's plan")
+        try:
+            days, source = self._kb().rule_days(
+                self.ctx.tenant, ben["product_code"], int(self.settings.as_of_date[:4]), "Grievance resolution timeframe"
+            )
+            res = deadline_status(g["received_date"], days, self.settings.as_of_date)
+        except (KbLookupError, ValueError, KeyError):
+            return _err("not_available", "The resolution timeframe for this plan is not available.")
+        resolved = g.get("resolved_date")
+        past = (parse_date(resolved) > parse_date(res["deadline"])) if resolved else res["deadline_passed"]
+        return {
+            "grievance_id": grievance_id, "status": g.get("status"), "received_date": g["received_date"],
+            "resolved_date": resolved, "resolution_timeframe_days": days, "resolution_deadline": res["deadline"],
+            "as_of": res["as_of"], "past_resolution_deadline": past,
+            "days_overdue": res["days_overdue"] if not resolved else None, "source": source,
+        }

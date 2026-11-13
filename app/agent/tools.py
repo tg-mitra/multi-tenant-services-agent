@@ -48,4 +48,44 @@ async def verify_caller(
     return await _gw(config).verify_caller(ssn_last4, dob)
 
 
-TOOLS = [get_member_summary, get_benefits, list_claims, get_claim, verify_caller]
+@tool
+async def search_plan_documents(query: str, config: RunnableConfig, plan_year: int | None = None) -> dict:
+    """Search THIS member's own plan documents (benefit summary, member services guide, claim codes) for
+    what the member pays and for plan rules. `query` is a short phrase such as 'specialist visit copay'.
+    `plan_year` is the plan year the question is about: leave empty for the current plan year (2026), use
+    2027 for 'next year' / 'after renewal'. Only passages of this member's plan are returned."""
+    return await _gw(config).search_plan_documents(query, plan_year)
+
+
+@tool
+async def get_plan_status(config: RunnableConfig) -> dict:
+    """How much of the member's in-network individual deductible and out-of-pocket maximum is met and
+    remaining, and how many physical therapy visits are used and left, for the current plan year.
+    Amounts are calculated for you: use them exactly as returned."""
+    return await _gw(config).get_plan_status()
+
+
+@tool
+async def check_appeal_window(claim_id: str, config: RunnableConfig) -> dict:
+    """For a DENIED claim: the appeal deadline (denial notice date + the plan's filing window), and whether
+    the member is still within it today. Dates are calculated for you: use them exactly as returned."""
+    return await _gw(config).check_appeal_window(claim_id)
+
+
+@tool
+async def list_grievances(config: RunnableConfig) -> dict:
+    """List the grievances already on file for the member (id, category, status, dates)."""
+    return await _gw(config).list_grievances()
+
+
+@tool
+async def check_grievance_deadline(grievance_id: str, config: RunnableConfig) -> dict:
+    """For one grievance (for example G26-600230): the plan's resolution deadline (received date + the
+    plan's timeframe) and whether it is past that deadline today. Calculated for you: use as returned."""
+    return await _gw(config).check_grievance_deadline(grievance_id)
+
+
+TOOLS = [
+    get_member_summary, get_benefits, list_claims, get_claim, verify_caller,
+    search_plan_documents, get_plan_status, check_appeal_window, list_grievances, check_grievance_deadline,
+]

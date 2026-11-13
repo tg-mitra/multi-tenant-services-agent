@@ -30,10 +30,15 @@ class Settings:
     max_verify_attempts: int  # verify_caller calls allowed per rep message
     dev_endpoints_enabled: bool  # GET /dev/members (reads the pack files directly; development only)
     pack_dir: Path  # root of the supplied pack (mock_services/, eval/, kb/ ...)
+    kb_dir: Path  # plan documents (default PACK_DIR/kb)
+    rag_top_k: int  # passages returned per plan-document search
 
 
 def get_settings() -> Settings:
+    pack_dir = Path(os.getenv("PACK_DIR", ".").strip() or ".")
     return Settings(
+        kb_dir=Path(os.getenv("KB_DIR", "").strip() or (pack_dir / "kb")),
+        rag_top_k=max(1, int(os.getenv("RAG_TOP_K", "5"))),
         openai_api_key=os.getenv("OPENAI_API_KEY", "").strip(),
         openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip(),
         openai_base_url=(os.getenv("OPENAI_BASE_URL", "").strip() or None),
@@ -54,7 +59,7 @@ def get_settings() -> Settings:
         phi_filter_enabled=os.getenv("PHI_FILTER_ENABLED", "true").strip().lower() not in ("0", "false", "no", "off"),
         max_verify_attempts=int(os.getenv("MAX_VERIFY_ATTEMPTS", "3")),
         dev_endpoints_enabled=os.getenv("DEV_ENDPOINTS_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on"),
-        pack_dir=Path(os.getenv("PACK_DIR", ".").strip() or "."),
+        pack_dir=pack_dir,
         history_turns=max(0, int(os.getenv("HISTORY_TURNS", "8").strip() or "8")),
         state_dir=Path(os.getenv("STATE_DIR", "./state").strip() or "./state"),
     )

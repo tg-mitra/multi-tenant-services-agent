@@ -17,6 +17,8 @@ class Settings:
     openai_base_url: str | None
     llm_temperature: float | None  # None = use the model's default
     llm_timeout_seconds: float
+    llm_input_cost_per_million: float  # USD per 1,000,000 input (prompt) tokens
+    llm_output_cost_per_million: float  # USD per 1,000,000 output (completion) tokens
     state_dir: Path
     history_turns: int  # most recent exchanges (rep message + reply) sent to the LLM; 0 = none
     member_api_base: str
@@ -32,6 +34,13 @@ class Settings:
     pack_dir: Path  # root of the supplied pack (mock_services/, eval/, kb/ ...)
     kb_dir: Path  # plan documents (default PACK_DIR/kb)
     rag_top_k: int  # passages returned per plan-document search
+    budget_turn_model_calls: int  # max model calls while answering one rep message (0 = no limit)
+    budget_turn_tool_calls: int  # max tool calls while answering one rep message (0 = no limit)
+    budget_turn_seconds: float  # hard time limit for one rep message's model path (0 = no limit)
+    budget_conversation_cost_usd: float  # max model cost over a whole conversation (0 = no limit)
+    budget_conversation_steps: int  # max model + tool calls over a whole conversation (0 = no limit)
+    budget_conversation_seconds: float  # max model-path time over a whole conversation (0 = no limit)
+    trace_hash_salt: str  # salt for the member-id hash written to traces
     directory_api_base: str  # third-party provider directory (default: <MEMBER_API_BASE>/directory/v3)
     directory_api_key: str  # vendor key, sent as X-Api-Key; never given to the model
     pending_ttl_seconds: int  # how long a grievance proposal waits for the rep's confirmation
@@ -43,6 +52,13 @@ def get_settings() -> Settings:
     pack_dir = Path(os.getenv("PACK_DIR", ".").strip() or ".")
     member_api_base = os.getenv("MEMBER_API_BASE", "http://localhost:8090").strip().rstrip("/")
     return Settings(
+        budget_turn_model_calls=max(0, int(os.getenv("BUDGET_TURN_MODEL_CALLS", "6"))),
+        budget_turn_tool_calls=max(0, int(os.getenv("BUDGET_TURN_TOOL_CALLS", "8"))),
+        budget_turn_seconds=max(0.0, float(os.getenv("BUDGET_TURN_SECONDS", "30"))),
+        budget_conversation_cost_usd=max(0.0, float(os.getenv("BUDGET_CONVERSATION_COST_USD", "0.03"))),
+        budget_conversation_steps=max(0, int(os.getenv("BUDGET_CONVERSATION_STEPS", "60"))),
+        budget_conversation_seconds=max(0.0, float(os.getenv("BUDGET_CONVERSATION_SECONDS", "900"))),
+        trace_hash_salt=os.getenv("TRACE_HASH_SALT", "vtask-dev-salt"),
         directory_api_base=(os.getenv("DIRECTORY_API_BASE", "").strip().rstrip("/") or f"{member_api_base}/directory/v3"),
         directory_api_key=os.getenv("DIRECTORY_API_KEY", "").strip(),
         kb_dir=Path(os.getenv("KB_DIR", "").strip() or (pack_dir / "kb")),
@@ -57,6 +73,8 @@ def get_settings() -> Settings:
             float(os.getenv("LLM_TEMPERATURE", "0")) if os.getenv("LLM_TEMPERATURE", "0").strip() else None
         ),
         llm_timeout_seconds=float(os.getenv("LLM_TIMEOUT_SECONDS", "30")),
+        llm_input_cost_per_million=max(0.0, float(os.getenv("LLM_INPUT_COST_PER_MILLION", "0") or 0)),
+        llm_output_cost_per_million=max(0.0, float(os.getenv("LLM_OUTPUT_COST_PER_MILLION", "0") or 0)),
         member_api_base=member_api_base,
         tenant_tokens={
             "plan_a": os.getenv("TENANT_TOKEN_PLAN_A", "").strip(),

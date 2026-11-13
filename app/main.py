@@ -12,13 +12,14 @@ import logging
 import uuid
 from typing import Literal, Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
 from app.config import get_settings
 from app.dev import PackNotFound, list_tenants_and_members
 from app.store.jsonfile import CONVERSATION_ID_RE, IdempotencyStore, JsonConversationStore
+from app.trace import read_trace
 from app.turns import TurnError, process_turn
 
 log = logging.getLogger("uvicorn.error")
@@ -53,6 +54,8 @@ class ConversationRequest(BaseModel):
 class ConversationResponse(BaseModel):
     conversation_id: str
     reply: str
+    # What this message and the conversation have used so far, and which limit stopped it (if any).
+    budget: Optional[dict] = None
 
 
 def _error(status: int, detail: str, conversation_id: str | None) -> JSONResponse:
@@ -103,4 +106,23 @@ async def conversations(req: ConversationRequest):
                 result = await process_turn(req, settings, store, idem, conversation_id, False)
     except TurnError as err:
         return _error(err.status, err.detail, err.conversation_id)
-    return ConversationResponse(conversation_id=result.conversation_id, reply=result.reply)
+    return ConversationResponse(conversation_id=result.conversation_id, reply=result.reply, budget=result.budget)
+
+
+@app.get("/conversations/{conversation_id}/trace")
+async def conversation_trace(
+    conversation_id: str,
+    tenant: Literal["plan_a", "plan_b"],
+    member_id: str = Query(pattern=r"^M\d{6}$"),
+    turn: Optional[int] = Query(default=None, ge=1),
+):
+    """The redacted step-by-step trace of a conversation: ids, timings, tokens, cost, gateway decisions.
+
+    Never contains message text. Like /conversations, an unknown id, or one that belongs to another
+    tenant or member, is simply 404 (no hint that it exists elsewhere)."""
+    settings = get_settings()
+    if not CONVERSATION_ID_RE.fullmatch(conversation_id) or JsonConversationStore(settings.state_dir).load(
+            tenant, member_id, conversation_id) is None:
+        return _error(404, "Conversation not found", None)
+    return {"conversation_id": conversation_id,
+            "events": read_trace(settings.state_dir, tenant, member_id, conversation_id, turn)}

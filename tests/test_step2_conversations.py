@@ -11,7 +11,7 @@ VALID = {"tenant": "plan_a", "member_id": "M749817", "message": "Hello"}
 
 
 def _fake_llm(monkeypatch, reply="ok"):
-    async def fake(message: str, history=None, gateway=None, extra_system=None) -> str:
+    async def fake(message: str, history=None, gateway=None, extra_system=None, budget=None, trace=None) -> str:
         return f"{reply}: {message}"
 
     monkeypatch.setattr(turns, "run_turn", fake)
@@ -112,7 +112,7 @@ def test_other_member_or_tenant_cannot_use_the_id(monkeypatch):
 # ---- failures -------------------------------------------------------------
 
 def test_llm_failure_on_new_conversation_creates_no_file(monkeypatch, isolated_state_dir):
-    async def boom(message: str, history=None, gateway=None, extra_system=None) -> str:
+    async def boom(message: str, history=None, gateway=None, extra_system=None, budget=None, trace=None) -> str:
         raise RuntimeError("secret upstream detail")
 
     monkeypatch.setattr(turns, "run_turn", boom)
@@ -120,14 +120,15 @@ def test_llm_failure_on_new_conversation_creates_no_file(monkeypatch, isolated_s
     assert r.status_code == 502
     assert r.json() == {"detail": "LLM request failed", "conversation_id": None}
     assert "secret" not in r.text
-    assert not isolated_state_dir.exists()
+    # no conversation file is created for a failed first call (an audit/trace entry is, on purpose)
+    assert list(isolated_state_dir.rglob("*.json")) == []
 
 
 def test_llm_failure_on_existing_conversation_keeps_id_and_file(monkeypatch, isolated_state_dir):
     _fake_llm(monkeypatch)
     cid = _post().json()["conversation_id"]
 
-    async def boom(message: str, history=None, gateway=None, extra_system=None) -> str:
+    async def boom(message: str, history=None, gateway=None, extra_system=None, budget=None, trace=None) -> str:
         raise RuntimeError("x")
 
     monkeypatch.setattr(turns, "run_turn", boom)

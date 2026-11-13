@@ -41,7 +41,7 @@ def test_empty_turns():
 def _capture(monkeypatch):
     seen = []
 
-    async def fake(message: str, history=None, gateway=None, extra_system=None) -> str:
+    async def fake(message: str, history=None, gateway=None, extra_system=None, budget=None, trace=None) -> str:
         seen.append((message, list(history or [])))
         return f"reply to {message}"
 

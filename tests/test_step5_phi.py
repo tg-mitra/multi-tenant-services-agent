@@ -191,7 +191,7 @@ def _state_text(state_dir) -> str:
 
 
 def test_reply_with_sensitive_value_is_blocked_and_not_stored(monkeypatch, isolated_state_dir):
-    async def fake(message, history=None, gateway=None, extra_system=None):
+    async def fake(message, history=None, gateway=None, extra_system=None, budget=None, trace=None):
         return f"The SSN is {CANARY_SSN}"
 
     monkeypatch.setattr(turns, "run_turn", fake)
@@ -203,7 +203,7 @@ def test_reply_with_sensitive_value_is_blocked_and_not_stored(monkeypatch, isola
 def test_rep_typed_identifiers_are_redacted_for_model_and_file(monkeypatch, isolated_state_dir):
     seen = {}
 
-    async def fake(message, history=None, gateway=None, extra_system=None):
+    async def fake(message, history=None, gateway=None, extra_system=None, budget=None, trace=None):
         seen["message"] = message
         return "ok"
 
@@ -225,7 +225,7 @@ def test_rep_typed_identifiers_are_redacted_for_model_and_file(monkeypatch, isol
 def test_filter_off_leaves_text_untouched(monkeypatch, isolated_state_dir):
     monkeypatch.setenv("PHI_FILTER_ENABLED", "false")
 
-    async def fake(message, history=None, gateway=None, extra_system=None):
+    async def fake(message, history=None, gateway=None, extra_system=None, budget=None, trace=None):
         return f"The SSN is {CANARY_SSN}"
 
     monkeypatch.setattr(turns, "run_turn", fake)
@@ -237,7 +237,7 @@ def test_filter_off_leaves_text_untouched(monkeypatch, isolated_state_dir):
 def test_follow_up_history_comes_from_the_redacted_file(monkeypatch):
     seen = []
 
-    async def fake(message, history=None, gateway=None, extra_system=None):
+    async def fake(message, history=None, gateway=None, extra_system=None, budget=None, trace=None):
         seen.append(list(history or []))
         return "ok"
 

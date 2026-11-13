@@ -87,6 +87,7 @@ class JsonConversationStore:
         is_new: bool,
         pending=_UNSET,
         last_event=_UNSET,
+        usage: dict | None = None,
     ) -> dict:
         """Add one exchange. Creates the file only when is_new is True.
 
@@ -120,6 +121,11 @@ class JsonConversationStore:
                 }
             )
             record["updated_at"] = record["turns"][-1]["ts"]
+            if usage is not None:  # this turn's usage, and the conversation's running totals
+                record["turns"][-1]["usage"] = usage
+                totals = record.setdefault("usage", {})
+                for k, v in usage.items():
+                    totals[k] = round(totals.get(k, 0) + v, 8) if isinstance(v, float) else totals.get(k, 0) + v
             if pending is not _UNSET:
                 record["pending_action"] = pending
             if last_event is not _UNSET:

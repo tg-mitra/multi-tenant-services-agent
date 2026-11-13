@@ -83,12 +83,42 @@ def _err(code: str, message: str) -> dict:
 
 
 def _filtered(fn):
-    """Scrub free text in a tool result for SSN/phone/email/DOB patterns (when PHI_FILTER_ENABLED)."""
+    """Every model-facing tool goes through this wrapper:
+      1. budget: refuse the call once the turn/conversation budget is used up (Step 9);
+      2. trace: one tool_call event with name, status and latency, never the content (Step 9);
+      3. scrub free text in the result for SSN/phone/email/DOB patterns (when PHI_FILTER_ENABLED).
+    A tool that calls another tool (check_appeal_window -> get_claim) is counted and traced once.
+    """
+    name = fn.__name__
 
     @functools.wraps(fn)
     async def wrapper(self, *args, **kwargs):
-        result = await fn(self, *args, **kwargs)
-        return sanitize_result(result) if self.settings.phi_filter_enabled else result
+        clean = (lambda r: sanitize_result(r) if self.settings.phi_filter_enabled else r)
+        if self._depth > 0:  # inner call: the outer tool is the one that counts
+            return clean(await fn(self, *args, **kwargs))
+        stop = self.budget.check_tool_call() if self.budget else None
+        if stop:
+            if self.trace:
+                self.trace.decision(name, "budget_stop", reason=stop)
+            return _err("budget_exceeded", "The usage limit for this request was reached, so this lookup was not done.")
+        self._depth += 1
+        started = time.perf_counter()
+        try:
+            result = await fn(self, *args, **kwargs)
+        except Exception:
+            if self.trace:
+                self.trace.event("tool_call", name=name, status="exception",
+                                 latency_ms=int((time.perf_counter() - started) * 1000))
+            raise
+        finally:
+            self._depth -= 1
+        if self.budget:
+            self.budget.add_tool_call()
+        if self.trace:
+            status = result.get("error", "ok") if isinstance(result, dict) else "ok"
+            self.trace.event("tool_call", name=name, status=status,
+                             latency_ms=int((time.perf_counter() - started) * 1000))
+        return clean(result)
 
     return wrapper
 
@@ -101,9 +131,14 @@ class ToolGateway:
         client: httpx.AsyncClient | None = None,
         kb: KnowledgeBase | None = None,
         idem_store: IdempotencyStore | None = None,
+        budget=None,  # app.budget.TurnBudget
+        trace=None,  # app.trace.Trace
     ):
         self.ctx = ctx
         self.settings = settings
+        self.budget = budget
+        self.trace = trace
+        self._depth = 0  # >0 while a tool is running (so nested tool calls are not double counted)
         self._kb_obj = kb
         self.idem = idem_store
         self.proposal: dict | None = None  # set by propose_grievance; persisted by the API layer
@@ -129,6 +164,8 @@ class ToolGateway:
         token = self.settings.tenant_tokens.get(self.ctx.tenant, "")
         if not token:
             log.warning("gateway tool=%s decision=denied reason=no_tenant_token", tool)
+            if self.trace:
+                self.trace.decision(tool, "denied", reason="no_tenant_token")
             return 0, None
         headers = {"Authorization": f"Bearer {token}"}
         started = time.perf_counter()
@@ -146,7 +183,11 @@ class ToolGateway:
                 except ValueError:
                     wait = 1.0
                 if wait > self.settings.retry_after_max_seconds:
+                    if self.trace:
+                        self.trace.decision(tool, "gave_up", reason="retry_after_too_long", http_status=429)
                     break  # would blow the latency budget: give up, report "busy"
+                if self.trace:
+                    self.trace.decision(tool, "retried", reason="rate_limited", http_status=429, attempts=attempt + 1)
                 await asyncio.sleep(max(wait, 0.0))
                 continue
             break
@@ -253,6 +294,7 @@ class ToolGateway:
                 next_cursor = None
         return {"claims": claims, "next_cursor": next_cursor, "order": "newest service date first"}
 
+    @_filtered
     async def verify_caller(self, ssn_last4: str | None = None, dob: str | None = None) -> dict:
         """Compare what the caller said with the record, inside the gateway.
 
@@ -269,6 +311,8 @@ class ToolGateway:
         if self._verify_calls > self.settings.max_verify_attempts:
             log.warning("gateway tool=verify_caller conv=%s decision=denied reason=too_many_attempts",
                         self.ctx.conversation_id)
+            if self.trace:
+                self.trace.decision("verify_caller", "denied", reason="too_many_attempts")
             return _err("too_many_attempts", "Too many verification attempts. Ask the rep to follow the manual process.")
         status, data = await self._get("verify_caller", self._member_path())
         if data is None:
@@ -297,6 +341,8 @@ class ToolGateway:
                 "gateway tool=get_claim conv=%s decision=denied reason=claim_not_owned_by_session_member",
                 self.ctx.conversation_id,
             )
+            if self.trace:
+                self.trace.decision("get_claim", "denied", reason="claim_not_owned_by_session_member")
             return self._failure(404, "The claim")  # same answer as a missing claim: no hint it exists
         return self._claim_view(data)
 
@@ -534,6 +580,8 @@ class ToolGateway:
         if not pending_is_consistent(pending, self.ctx.tenant, self.ctx.member_id):
             log.error("gateway tool=file_grievance conv=%s decision=denied reason=inconsistent_pending",
                       self.ctx.conversation_id)
+            if self.trace:
+                self.trace.decision("file_grievance", "denied", reason="inconsistent_pending")
             return {"state": "failed", "reason": "inconsistent_pending"}
         headers = self._auth_headers()
         if headers is None:
@@ -563,6 +611,9 @@ class ToolGateway:
                 log.info("gateway tool=file_grievance conv=%s key=%s attempt=%d status=%s ms=%d",
                          self.ctx.conversation_id, key[:10], attempts, status,
                          int((time.perf_counter() - started) * 1000))
+                if self.trace:
+                    self.trace.decision("file_grievance", "attempt", http_status=status, attempts=attempts,
+                                        key_prefix=key[:10], latency_ms=int((time.perf_counter() - started) * 1000))
                 if status in (200, 201):
                     try:
                         grievance = resp.json()
@@ -684,6 +735,9 @@ class ToolGateway:
                 dropped += 1
         if dropped:
             log.warning("gateway tool=find_providers conv=%s decision=filtered dropped=%d", self.ctx.conversation_id, dropped)
+            if self.trace:
+                self.trace.decision("find_providers", "filtered", reason="not_in_member_network_area_or_specialty",
+                                    dropped=dropped, count=len(kept))
         result = {
             "specialty": spec, "network": network,
             "searched_near": f"ZIP area {area[:3]}xx" + (" (the member's home area)" if not zip_code else ""),

@@ -4,7 +4,9 @@ Governed multi-tenant assistant for member-services reps. See `SPEC.md` for the 
 
 Dev helper: `GET /dev/members` (optional `?tenant=plan_a`) lists the tenants, their products and every member id with plan, coverage status and the eval cases that use that member, so you know what to send to `/conversations`. It returns no names, DOB, SSN or other PHI. It is off unless `DEV_ENDPOINTS_ENABLED=true` in `.env` and it reads the pack files directly (the mock API has no list endpoint), so it is for development only.
 
-Current status: Step 8 (provider directory). Ask for an in-network dermatologist, cardiologist, etc. near the member: results come only from the member's own plan network, near their home ZIP area (or a ZIP the rep names), and no member data is sent to the vendor. Needs `DIRECTORY_API_KEY` in `.env`.
+Current status: Step 9 (budgets and trace). Every conversation has limits on model calls, tool calls, time and cost (`BUDGET_*` and the `LLM_*_COST_PER_MILLION` prices in `.env`); when one is reached the rep gets a clear message instead of a hang. Every response includes a `budget` summary, and `GET /conversations/{id}/trace?tenant=plan_a&member_id=M123456` returns the step-by-step trace (model calls with tokens and cost, tool calls, gateway decisions, confirmations). Traces hold no message text and no raw member ids. Files: `state/<tenant>/<member>/<id>.trace.jsonl` and `state/<tenant>/audit/<date>.jsonl`.
+
+Earlier: Step 8 (provider directory). Ask for an in-network dermatologist, cardiologist, etc. near the member: results come only from the member's own plan network, near their home ZIP area (or a ZIP the rep names), and no member data is sent to the vendor. Needs `DIRECTORY_API_KEY` in `.env`.
 
 Earlier: Step 7 (grievances with human confirmation). Ask the assistant to file a grievance: it prepares one and shows a read-back (nothing is filed). Reply "confirm" in your next message to file it, or "cancel". Filing happens exactly once, even if the grievance system answers 503 or you confirm twice. Details in `SPEC.md` (Step 7).
 

@@ -16,7 +16,7 @@ def test_health():
 
 
 def test_conversation_returns_reply(monkeypatch):
-    async def fake(message: str, history=None, gateway=None, extra_system=None) -> str:
+    async def fake(message: str, history=None, gateway=None, extra_system=None, budget=None, trace=None) -> str:
         return f"echo: {message}"
 
     monkeypatch.setattr(turns, "run_turn", fake)
@@ -44,7 +44,7 @@ def test_rejects_empty_message():
 
 
 def test_missing_key_gives_503(monkeypatch):
-    async def boom(message: str, history=None, gateway=None, extra_system=None) -> str:
+    async def boom(message: str, history=None, gateway=None, extra_system=None, budget=None, trace=None) -> str:
         raise LLMNotConfigured("x")
 
     monkeypatch.setattr(turns, "run_turn", boom)
@@ -53,7 +53,7 @@ def test_missing_key_gives_503(monkeypatch):
 
 
 def test_llm_failure_does_not_leak_details(monkeypatch):
-    async def boom(message: str, history=None, gateway=None, extra_system=None) -> str:
+    async def boom(message: str, history=None, gateway=None, extra_system=None, budget=None, trace=None) -> str:
         raise RuntimeError("secret upstream detail")
 
     monkeypatch.setattr(turns, "run_turn", boom)
